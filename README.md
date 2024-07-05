@@ -1,6 +1,3 @@
-Here's the improved markdown code for your README file:
-
-```markdown
 # AI-Powered Resume Screening System
 
 ## Problem Statement
