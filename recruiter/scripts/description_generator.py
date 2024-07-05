@@ -1,4 +1,3 @@
-from random import sample
 import sqlite3
 import pandas as pd
 from langchain_community.chat_models import ChatOpenAI
@@ -178,3 +177,5 @@ categorical_columns = df.select_dtypes(include=['object']).columns.tolist()
 # Store descriptions and column types in the database
 store_descriptions_in_db(column_descriptions, numerical_columns, categorical_columns)
 
+print(column_descriptions)
+print("Column descriptions and column types stored in the database.")

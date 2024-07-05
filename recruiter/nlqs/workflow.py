@@ -29,11 +29,18 @@ def main_workflow(user_input:str, chat_history:List[Tuple[str, str]], column_des
     user_input = re.sub(r"{|}", "", user_input)
     summarized_input = summarize(user_input, chat_history, column_descriptions_dict, numerical_columns_list, categorical_columns_list)
 
-    if not summarized_input:
+    count = 0
+    while not summarized_input and count < 5:
         summarized_input = summarize(user_input, chat_history, column_descriptions_dict, numerical_columns_list, categorical_columns_list)
-
-    if not summarized_input:
-        response = "Summarization failed. Please try again."
+        count += 1
+        if count == 5:
+            response = "Summarization failed. Please try again."
+            break
+    
+    print(f"summarized_input: {summarized_input}")
+    print(type(summarized_input))
+    # if not summarized_input:
+    #     response = "Summarization failed. Please try again."
 
     intent = summarized_input.user_intent
     

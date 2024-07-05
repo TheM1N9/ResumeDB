@@ -68,7 +68,7 @@ def get_chroma_collections() -> Chroma:
     Returns:
         Chroma: _description_
     """
-    chroma_client = chromadb.PersistentClient()
+    chroma_client = chromadb.PersistentClient(path='./chroma')
     collection_name = CHROMA_COLLECTION_NAME
     collections = [col.name for col in chroma_client.list_collections()]
     print(collections)
