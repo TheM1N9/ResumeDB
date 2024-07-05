@@ -1,5 +1,5 @@
 import json
-from flask import Flask, request, render_template, redirect, url_for, flash
+from flask import Flask, request, render_template, redirect, url_for, flash, send_from_directory
 import os
 from werkzeug.utils import secure_filename
 from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader, TextLoader
@@ -15,7 +15,6 @@ from sqlalchemy.orm import sessionmaker
 load_dotenv()
 
 api_key = os.getenv('OPENAI_API_KEY')
-SQL_TABLE_NAME =   os.getenv('SQL_TABLE_NAME')
 
 app = Flask(__name__)
 app.secret_key = 'supersecretkey'
@@ -37,16 +36,14 @@ engine = create_engine(f"sqlite:///{DATABASE_URL}")
 Base = declarative_base()
 
 class Resume(Base):
-    __tablename__ = SQL_TABLE_NAME
+    __tablename__ = 'resumes'
     id = Column(String, primary_key=True)
     name = Column(String, nullable=False)
     contact_details = Column(JSON, nullable=False)
     skills = Column(JSON, nullable=False)
-    projects = Column(JSON, nullable=True)
+    projects = Column(JSON, nullable=False)
     education = Column(JSON, nullable=False)
-    experience = Column(JSON, nullable=True)
-    certifications = Column(JSON,nullable=True)
-    achievements = Column(JSON,nullable=True)
+    experience = Column(JSON, nullable=False)
 
 Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
@@ -79,8 +76,6 @@ class OrganizeInput:
     projects: List[Dict[str, str]]
     education: List[Dict[str, str]]
     experience: Dict[str, str]
-    certifications: List[Dict[str,str]]
-    achievements: List[Dict[str,str]]
 
 def generate_data(text):
     template = """you will be given a resume of a person. 
@@ -110,38 +105,39 @@ def generate_data(text):
         skills=final_dict.get("skills", {}),
         education=final_dict.get("education", []),
         experience=final_dict.get("experience", {}),
-        projects=final_dict.get("projects", []),
-        certifications=final_dict.get("certifications", []),
-        achievements=final_dict.get("achievements", []),
+        projects=final_dict.get("projects", [])
     )
     return final_dict
 
 def save_to_database(data, file):
+    # Serialize data to JSON
+    contact_details = json.dumps(data.contact_details)
+    skills = json.dumps(data.skills)
+    education = json.dumps(data.education)
+    experience = json.dumps(data.experience)
+    projects = json.dumps(data.projects)
+
     # Check if a resume with the given filename already exists
     existing_resume = session.query(Resume).filter_by(id=file).first()
 
     if existing_resume:
         # Update existing resume
         existing_resume.name = data.name
-        existing_resume.contact_details = data.contact_details
-        existing_resume.skills = data.skills
-        existing_resume.education = data.education
-        existing_resume.experience = data.experience
-        existing_resume.projects = data.projects
-        existing_resume.certifications = data.certifications
-        existing_resume.achievements = data.achievements
+        existing_resume.contact_details = contact_details
+        existing_resume.skills = skills
+        existing_resume.education = education
+        existing_resume.experience = experience
+        existing_resume.projects = projects
     else:
         # Create a new resume
         resume = Resume(
             id=file,
             name=data.name,
-            contact_details=data.contact_details,
-            skills=data.skills,
-            education=data.education,
-            experience=data.experience,
-            projects=data.projects,
-            certifications=data.certifications,
-            achievements=data.achievements
+            contact_details=contact_details,
+            skills=skills,
+            education=education,
+            experience=experience,
+            projects=projects
         )
         session.add(resume)
     
@@ -183,6 +179,15 @@ def upload():
 
     flash('Files uploaded successfully')
     return redirect(url_for('index'))
+
+@app.route('/resumes')
+def list_resumes():
+    resumes = session.query(Resume).all()
+    return render_template('resumes.html', resumes=resumes)
+
+@app.route('/uploads/<filename>')
+def uploaded_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

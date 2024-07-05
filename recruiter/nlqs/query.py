@@ -3,7 +3,6 @@ import json
 from xml.dom.minidom import Document
 import logging
 from dataclasses import dataclass
-# from discord_bot.parameters import OPENAI_API_KEY, PRODUCT_DESCRIPTIONS_CSV, SQLITE_DB_FILE, SQL_TABLE_NAME, LOGGER_FILE
 from langchain.memory import ConversationBufferMemory
 from langchain_core.prompts import PromptTemplate
 from langchain.chains import LLMChain
@@ -13,7 +12,6 @@ from langchain_community.vectorstores import Chroma
 from langchain_community.document_loaders.csv_loader import CSVLoader
 from pydantic.v1 import SecretStr
 from langchain.schema import Document
-# from discord_bot.parameters import OPENAI_API_KEY
 import chromadb
 import os
 from dotenv import load_dotenv
@@ -24,7 +22,6 @@ load_dotenv()
 
 OPENAI_API_KEY =  os.getenv("OPENAI_API_KEY")
 SQLITE_DB_FILE = os.getenv("SQLITE_DB_FILE")
-# PRODUCT_DESCRIPTIONS_CSV = os.getenv("PRODUCT_DESCRIPTIONS_CSV")
 SQL_TABLE_NAME = os.getenv("SQL_TABLE_NAME")
 LOGGER_FILE = os.getenv("LOGGER_FILE")
 CHROMA_COLLECTION_NAME = os.getenv("CHROMA_COLLECTION_NAME")
@@ -63,10 +60,10 @@ class SummarizedInput:
 #         self.column_descriptions, self.numerical_columns, self.categorical_columns = retrieve_descriptions_and_types_from_db()
 
 def get_chroma_collections() -> Chroma:
-    """_summary_
+    """Get or create a chroma collection.
 
     Returns:
-        Chroma: _description_
+        Chroma: chroma collection.
     """
     chroma_client = chromadb.PersistentClient(path='./chroma')
     collection_name = CHROMA_COLLECTION_NAME
@@ -89,6 +86,8 @@ def get_chroma_collections() -> Chroma:
 
             for text,pro,meta in zip(texts,data['id'],metadata):
                 chroma_collection = collection.add(documents=text, ids=pro, metadatas={"student details: 'contact_details','education','experience','achievements'": meta})
+
+            chroma_collection = chroma_client.get_collection(collection_name)
 
     return chroma_collection
 
@@ -130,7 +129,7 @@ def summarize(user_input:str, chat_history:List[Tuple[str, str]], column_descrip
 
     Args:
         user_input (str): The user input.
-        chat_history (list[(str, str)]): The chat history.
+        chat_history (list[tuple(str, str)]): The chat history.
         column_descriptions (dict[str, str]): The column descriptions.
         numerical_columns (list[str]): The numerical columns.
         categorical_columns (list[str]): The categorical columns.
@@ -171,6 +170,7 @@ def summarize(user_input:str, chat_history:List[Tuple[str, str]], column_descrip
        - Look for explicit mentions of column names, synonyms, or phrases that indicate the type of information requested. If the user specifies certain attributes or metrics, consider these as user-requested columns.
     4. Classify the user's intent. Possible intents include: phatic_communication, sql_injection, profanity, and other.
     5. Output the result in a JSON format.
+    6. Do not output any other information except the JSON. Do not add [OUT], [/OUT] to the output.(!important)
     
     The output JSON should have the following structure:
 
@@ -207,12 +207,16 @@ def summarize(user_input:str, chat_history:List[Tuple[str, str]], column_descrip
     llm_chain = LLMChain(llm=llm, prompt=prompt_template, verbose=True, memory=memory)
     
     summarized_input_str = llm_chain.run({"chat_history": chat_history, "user_input": user_input})
+    # print(f"summarized input str: {summarized_input_str}")
+    # summarized_input_str = summarized_input_str.replace("[OUT]","")
     try:
         # Attempt to parse the summarized input as JSON
         summarized_input_dict = json.loads(summarized_input_str)
     except json.JSONDecodeError:
         # If parsing fails, return an empty SummarizedInput
         summarized_input_dict = {}
+
+    # print(f"summarized input dict: {summarized_input_dict}")
 
     logger.info("--------------------------")
     logger.info(f"user input: {user_input}")
@@ -239,14 +243,11 @@ def similarity_search(collection: Chroma, user_input:str) -> str:
         str: the first similar result.
 
     """
-    result = collection.query(query_texts=user_input, n_results=1, include=['documents', 'metadatas'])
+    result = collection.query(query_texts=user_input, n_results=3, include=['documents', 'metadatas'])
     if result:
         result_str = str(result)
         result_str = result_str.replace("{", "")
         result_str = result_str.replace("}", '"')
-        print('----------------------')
-        print(type(result_str))
-        print('----------------------')
         logger.info(f"Result: {result_str}")
         return result_str
     else:
@@ -283,6 +284,7 @@ def generate_query(user_input:str, summarized_input: SummarizedInput, chat_histo
     For descriptive columns, use 'LIKE' for partial matches but handle possible spelling mistakes and close matches. 
     
     Generate the query according to the user input, chat history, and database schema. 
+    Make sure you all ways retieve 'id' column from the database when a details of resume is requested.
     Ensure that the query is robust, handles various user input scenarios, and incorporates appropriate conditions.
     Answer just the query without any explanation and code. 
 
@@ -312,12 +314,25 @@ def generate_query(user_input:str, summarized_input: SummarizedInput, chat_histo
 
     return query
 
-def generate_response(user_input, query_result, chat_history):
+def generate_response(user_input:str, query_result:str, chat_history:List[Tuple[str, str]]) -> str:
+    """Generates a response based on the user input and the query result.
+
+    Args:
+        user_input (str): The user input.
+        query_result (str): The retrieved data from the database.
+        chat_history (list[tuple(str, str)]): Chat history.
+
+    Returns:
+        str: The response.
+    """
 
     query_result_str = query_result.replace("{","'")
     query_result_str = query_result_str.replace("}","'")
     
-    instruction = f"Provide an answer based on the user input and the data retrieved from the database. User input: {user_input}\n\ndata : {query_result_str}\n\nChat history: {chat_history}"
+    instruction = f"""Provide an answer based on the user input and the data retrieved from the database. 
+    The link for the resumes is "http://localhost:5000/uploads/'id'". Do not add ' before and after the id of the resume.
+    Also talk about the data you received.
+    User input: {user_input}\n\ndata : {query_result_str}\n\nChat history: {chat_history}"""
     system_prompt = "You are a perfect Automated tracking system. Your task is to provide an answer based on the user input and the data retrieved from the database."
     prompt = get_prompt(instruction, system_prompt)
     prompt_template = PromptTemplate(template=prompt, input_variables=["chat_history", "user_input"])
@@ -326,5 +341,4 @@ def generate_response(user_input, query_result, chat_history):
     llm_chain = LLMChain(llm=llm, prompt=prompt_template, verbose=True, memory=memory)
     response = llm_chain.run({"chat_history": chat_history, "user_input": query_result_str})
     
-    # chat_history.append((user_input, response))
     return response

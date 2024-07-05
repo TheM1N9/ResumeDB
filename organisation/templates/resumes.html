@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Uploaded Resumes</title>
+    <style>
+      body {
+        font-family: "Arial", sans-serif;
+        background-color: #f4f4f9;
+        color: #333;
+        margin: 0;
+        padding: 0;
+      }
+
+      h1 {
+        text-align: center;
+        color: #2980b9;
+        margin-top: 30px;
+      }
+
+      ul {
+        list-style: none;
+        padding: 0;
+        margin: 20px auto;
+        max-width: 600px;
+      }
+
+      li {
+        background: #fff;
+        margin: 10px 0;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+      }
+
+      li:hover {
+        background: #2980b9;
+        color: #fff;
+        transform: translateY(-5px);
+      }
+
+      a {
+        text-decoration: none;
+        color: inherit;
+        font-weight: bold;
+      }
+
+      a:hover {
+        text-decoration: underline;
+      }
+
+      .back-link {
+        display: block;
+        text-align: center;
+        margin-top: 20px;
+        font-size: 18px;
+      }
+
+      .back-link a {
+        color: #2980b9;
+        text-decoration: none;
+        font-weight: bold;
+      }
+
+      .back-link a:hover {
+        text-decoration: underline;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Uploaded Resumes</h1>
+    <ul>
+      {% for resume in resumes %}
+      <a href="{{ url_for('uploaded_file', filename=resume.id) }}">
+        <li>{{ resume.name }}</li>
+      </a>
+      {% endfor %}
+    </ul>
+    <div class="back-link">
+      <a href="{{ url_for('index') }}">Back to upload</a>
+    </div>
+  </body>
+</html>

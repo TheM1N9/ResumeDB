@@ -37,23 +37,23 @@ def fetch_data_from_sqlite(db_file: Path, table_name: str) -> Optional[pd.DataFr
      
     return df
 
-def generate_sample_data(dataframe: pd.DataFrame) -> List[str]:
-    """Generate sample data for each column in the DataFrame.
+# def generate_sample_data(dataframe: pd.DataFrame) -> List[str]:
+#     """Generate sample data for each column in the DataFrame.
 
-    Args:
-        dataframe (pd.DataFrame): The DataFrame containing the data.
+#     Args:
+#         dataframe (pd.DataFrame): The DataFrame containing the data.
 
-    Returns:
-        List[str]: A list of strings containing the column name, sample data, and data type.
-    """
-    sample_data_list = []
-    for column in dataframe.columns:
-        col_data = dataframe[column]
-        col_type = col_data.dtype
-        sample_data = col_data.dropna().sample(min(5, len(col_data))).tolist()
-        sample_data_str = ', '.join(map(str, sample_data))
-        sample_data_list.append(f"{column}: {sample_data_str}, {col_type}")
-    return sample_data_list
+#     Returns:
+#         List[str]: A list of strings containing the column name, sample data, and data type.
+#     """
+#     sample_data_list = []
+#     for column in dataframe.columns:
+#         col_data = dataframe[column]
+#         col_type = col_data.dtype
+#         sample_data = col_data.dropna().sample(min(5, len(col_data))).tolist()
+#         sample_data_str = ', '.join(map(str, sample_data))
+#         sample_data_list.append(f"{column}: {sample_data_str}, {col_type}")
+#     return sample_data_list
 
 def get_column_descriptions(dataframe, input_text) -> dict:
     """Get column descriptions from OpenAI API."""
@@ -158,24 +158,24 @@ def store_descriptions_in_db(descriptions, numerical_columns, categorical_column
     conn.commit()
     conn.close()
 
-df = fetch_data_from_sqlite(Path(SQLITE_DB_FILE),SQL_TABLE_NAME)
+df = fetch_data_from_sqlite(db_file=Path(SQLITE_DB_FILE),table_name=SQL_TABLE_NAME)
 
 if df is None:
     print("Error fetching data from SQLite.")
     raise Exception("Error fetching data from SQLite.")
 
 # Generate sample data for each column
-sample_data_list = generate_sample_data(df)
+# sample_data_list = generate_sample_data(dataframe=df)
 
 # Get column descriptions
-column_descriptions = get_column_descriptions(df, input_text="Please provide a detailed description of each column in the given dataset.")
+column_descriptions = get_column_descriptions(dataframe=df, input_text="Please provide a detailed description of each column in the given dataset.")
 
 # Identify numerical and categorical columns
 numerical_columns = df.select_dtypes(include=['int64', 'float64']).columns.tolist()
 categorical_columns = df.select_dtypes(include=['object']).columns.tolist()
 
 # Store descriptions and column types in the database
-store_descriptions_in_db(column_descriptions, numerical_columns, categorical_columns)
+store_descriptions_in_db(descriptions=column_descriptions, numerical_columns=numerical_columns, categorical_columns=categorical_columns)
 
 print(column_descriptions)
 print("Column descriptions and column types stored in the database.")

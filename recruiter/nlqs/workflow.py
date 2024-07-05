@@ -3,9 +3,14 @@ import re
 from recruiter.nlqs.database.sqlite import retrieve_descriptions_and_types_from_db, execute_query, validate_query
 from recruiter.nlqs.query import generate_response, get_chroma_collections, similarity_search, summarize, generate_query
 
-# data_vectors = get_chroma_instance()
 chroma_collections = get_chroma_collections()
-column_descriptions, numerical_columns, categorical_columns = retrieve_descriptions_and_types_from_db()
+
+try:
+    column_descriptions, numerical_columns, categorical_columns = retrieve_descriptions_and_types_from_db()
+except Exception as e:
+    print(e)
+    from recruiter.scripts.description_generator import store_descriptions_in_db
+    column_descriptions, numerical_columns, categorical_columns = retrieve_descriptions_and_types_from_db()
 
 def main_workflow(user_input:str, chat_history:List[Tuple[str, str]], column_descriptions_dict:Dict[str,str]=column_descriptions, numerical_columns_list:List[str]=numerical_columns, categorical_columns_list:List[str]=categorical_columns, collections = chroma_collections) -> Tuple[str,List[Tuple[str, str]]]:
     """This function is where the whole interaction happens. 
@@ -30,22 +35,20 @@ def main_workflow(user_input:str, chat_history:List[Tuple[str, str]], column_des
     summarized_input = summarize(user_input, chat_history, column_descriptions_dict, numerical_columns_list, categorical_columns_list)
 
     count = 0
-    while not summarized_input and count < 5:
+    print(f"summarized_input: {summarized_input}")
+    while not summarized_input.summary and count < 5:
         summarized_input = summarize(user_input, chat_history, column_descriptions_dict, numerical_columns_list, categorical_columns_list)
         count += 1
         if count == 5:
             response = "Summarization failed. Please try again."
             break
     
-    print(f"summarized_input: {summarized_input}")
-    print(type(summarized_input))
-    # if not summarized_input:
-    #     response = "Summarization failed. Please try again."
+    # print(f"summarized_input: {summarized_input}")
+    # print(type(summarized_input))
 
     intent = summarized_input.user_intent
     
     if intent == "phatic_communication" or intent == "sql_injection" or intent == "profanity":
-        # response = ""
         response = generate_response(user_input=user_input, chat_history=chat_history, query_result="")
     
     else:
@@ -55,7 +58,6 @@ def main_workflow(user_input:str, chat_history:List[Tuple[str, str]], column_des
                 query_result = execute_query(genenerted_query)
                 if query_result == str([]):
                     query_result = similarity_search(collections, user_input)
-                # response = query_result
             else:
                 query_result = "error while generating query. Please try again."
         else:

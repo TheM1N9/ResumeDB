@@ -2,7 +2,6 @@ import re
 import sqlite3
 import logging
 from typing import Optional, Tuple
-# from discord_bot.parameters import LOGGER_FILE, SQLITE_DB_FILE
 from recruiter.nlqs import query
 from recruiter.nlqs.database.driver import AbstractDriver
 import os
@@ -51,19 +50,6 @@ class SQLiteDriver(AbstractDriver):
 
     def validate_query(self, query, db_file):
         pass
-
-# def fetch_data_from_sqlite(db_file: str= SQLITE_DB_FILE, table_name: str= SQL_TABLE_NAME) -> Optional[pd.DataFrame]:
-#     try:
-#         conn = sqlite3.connect(db_file)
-#         query = f"SELECT * FROM {table_name}"
-#         df = pd.read_sql_query(query, conn)
-#         conn.close()
-#     except sqlite3.Error as e:
-#         print(f"Error fetching data: {e}")
-#         return None  # Return an empty DataFrame on error
-     
-#     return df
-
 
 def retrieve_descriptions_and_types_from_db(db_file: str= SQLITE_DB_FILE) -> Tuple:
     """ Retrieves descriptions and types from the SQLite database.
