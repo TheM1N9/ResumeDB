@@ -48,7 +48,7 @@ def main_workflow(user_input:str, chat_history:List[Tuple[str, str]], column_des
 
     intent = summarized_input.user_intent
     
-    if intent == "phatic_communication" or intent == "sql_injection" or intent == "profanity":
+    if intent == "sql_injection" or intent == "profanity":
         response = generate_response(user_input=user_input, chat_history=chat_history, query_result="")
     
     else:

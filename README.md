@@ -14,6 +14,7 @@ This AI agent helps recruiters find the most suitable candidates efficiently and
 
 ## Prerequisites
 
+- **OpenAI API Key**
 - Python 3.10+
 - [Poetry](https://python-poetry.org/) (for dependency management and virtual environments)
 - Flask
@@ -109,5 +110,5 @@ We welcome contributions to improve the project. Feel free to open issues or sub
 ## Future Updates
 
 1. Display the database in the form of a table on a webpage.
-2. Create a separate page for students to upload their resume file and enter the job description to check the ATS score and the details of their resume.
-```
+2. We need to make use of other open and free models.
+3. Create a separate page for students to upload their resume file and enter the job description to check the ATS score and the details of their resume.
