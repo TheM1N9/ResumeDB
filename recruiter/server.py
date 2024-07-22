@@ -8,7 +8,7 @@ from recruiter.scripts.gradio_bot import main
 
 def run_server():
     bot = main()
-    bot.run()
+    bot.run() # type: ignore
     
 
 

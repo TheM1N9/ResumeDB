@@ -9,9 +9,9 @@ import pandas as pd
 from dotenv import load_dotenv
 load_dotenv()
 
-LOGGER_FILE = os.getenv("LOGGER_FILE")
-SQLITE_DB_FILE = os.getenv("SQLITE_DB_FILE")
-SQL_TABLE_NAME = os.getenv("SQL_TABLE_NAME")
+LOGGER_FILE = os.getenv("LOGGER_FILE", 'chatbot.log')
+SQLITE_DB_FILE = os.getenv("SQLITE_DB_FILE", './uploads/resumes.db')
+SQL_TABLE_NAME = os.getenv("SQL_TABLE_NAME", 'resumes')
 
 # Create a logger object
 logger = logging.getLogger(__name__)

@@ -37,13 +37,15 @@ Base = declarative_base()
 
 class Resume(Base):
     __tablename__ = 'resumes'
-    id = Column(String, primary_key=True)
-    name = Column(String, nullable=False)
-    contact_details = Column(JSON, nullable=False)
-    skills = Column(JSON, nullable=False)
-    projects = Column(JSON, nullable=False)
-    education = Column(JSON, nullable=False)
-    experience = Column(JSON, nullable=False)
+    id = Column(String, primary_key=True)  # ID should be a string (filename)
+    name = Column(String, nullable=False)  # Name should be a string
+    contact_details = Column(JSON, nullable=False)  # Contact details should be JSON
+    skills = Column(JSON, nullable=False)  # Skills should be JSON
+    projects = Column(JSON, nullable=False)  # Projects should be JSON
+    education = Column(JSON, nullable=False)  # Education should be JSON
+    experience = Column(JSON, nullable=True)  # Experience should be JSON (nullable)
+    certifications = Column(JSON, nullable=True)  # Certifications should be JSON (nullable)
+    achievements = Column(JSON, nullable=True)  # Achievements should be JSON (nullable)
 
 Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
@@ -76,6 +78,8 @@ class OrganizeInput:
     projects: List[Dict[str, str]]
     education: List[Dict[str, str]]
     experience: Dict[str, str]
+    certifications: Dict[str,str]
+    achievements: Dict[str,str]
 
 def generate_data(text):
     template = """you will be given a resume of a person. 
@@ -105,7 +109,9 @@ def generate_data(text):
         skills=final_dict.get("skills", {}),
         education=final_dict.get("education", []),
         experience=final_dict.get("experience", {}),
-        projects=final_dict.get("projects", [])
+        projects=final_dict.get("projects", []),
+        certifications=final_dict.get("certifications", {}),
+        achievements=final_dict.get("achievements",{})
     )
     return final_dict
 
@@ -116,6 +122,8 @@ def save_to_database(data, file):
     education = json.dumps(data.education)
     experience = json.dumps(data.experience)
     projects = json.dumps(data.projects)
+    certifications = json.dumps(data.certifications)
+    achievements = json.dumps(data.achievements)
 
     # Check if a resume with the given filename already exists
     existing_resume = session.query(Resume).filter_by(id=file).first()
@@ -128,6 +136,8 @@ def save_to_database(data, file):
         existing_resume.education = education
         existing_resume.experience = experience
         existing_resume.projects = projects
+        existing_resume.certifications = certifications
+        existing_resume.achievements = achievements
     else:
         # Create a new resume
         resume = Resume(
@@ -137,7 +147,9 @@ def save_to_database(data, file):
             skills=skills,
             education=education,
             experience=experience,
-            projects=projects
+            projects=projects,
+            certifications=certifications,
+            achievements=achievements
         )
         session.add(resume)
     
@@ -163,7 +175,7 @@ def upload():
         if file.filename == '':
             continue
         if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
+            filename = secure_filename(file.filename) # type: ignore
             file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
             if get_file_extension(filename) == 'pdf':
                 pdf_content = pdf_file_loader(filename)

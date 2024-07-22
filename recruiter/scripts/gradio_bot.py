@@ -20,6 +20,9 @@ def main():
         msg.submit(main_workflow, [msg, chatbot], [msg, chatbot])
 
     # Launch the interface
-        demo.launch(debug=True, share=True)
+        try:
+            demo.launch(debug=True, share=True)
+        except:
+            demo.launch(debug=True)
 
         return chatbot

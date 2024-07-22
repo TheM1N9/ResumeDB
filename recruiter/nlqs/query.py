@@ -10,6 +10,7 @@ from langchain_community.chat_models import ChatOpenAI
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain_community.document_loaders.csv_loader import CSVLoader
+from pandas import DataFrame
 from pydantic.v1 import SecretStr
 from langchain.schema import Document
 import chromadb
@@ -21,10 +22,10 @@ from recruiter.nlqs.database.database_utils import fetch_data_from_sqlite
 load_dotenv()
 
 OPENAI_API_KEY =  os.getenv("OPENAI_API_KEY")
-SQLITE_DB_FILE = os.getenv("SQLITE_DB_FILE")
-SQL_TABLE_NAME = os.getenv("SQL_TABLE_NAME")
-LOGGER_FILE = os.getenv("LOGGER_FILE")
-CHROMA_COLLECTION_NAME = os.getenv("CHROMA_COLLECTION_NAME")
+SQLITE_DB_FILE = os.getenv("SQLITE_DB_FILE", './uploads/resumes.db')
+SQL_TABLE_NAME = os.getenv("SQL_TABLE_NAME", 'resumes')
+LOGGER_FILE = os.getenv("LOGGER_FILE", 'chatbot.log')
+CHROMA_COLLECTION_NAME = os.getenv("CHROMA_COLLECTION_NAME", 'my_collection1')
 
 
 # Create a logger object
@@ -77,7 +78,7 @@ def get_chroma_collections() -> Chroma:
             print("Creating new collection...")
             collection = chroma_client.create_collection(collection_name)
 
-            data = fetch_data_from_sqlite(db_file=SQLITE_DB_FILE, table_name=SQL_TABLE_NAME)
+            data: DataFrame = fetch_data_from_sqlite(db_file=SQLITE_DB_FILE, table_name=SQL_TABLE_NAME)
 
             data['combined_text'] = data[['name', 'skills', 'projects', 'certifications']].apply(lambda x: ' '.join(x.dropna().astype(str)), axis=1)
             texts = data['combined_text'].tolist()

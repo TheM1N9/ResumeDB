@@ -1,3 +1,4 @@
+import re
 import sqlite3
 import pandas as pd
 from langchain_community.chat_models import ChatOpenAI
@@ -5,18 +6,17 @@ from langchain.chains import LLMChain
 from langchain_core.prompts import ChatPromptTemplate
 from pathlib import Path
 from typing import Optional, List
-# from discord_bot.parameters import OPENAI_API_KEY, SQL_TABLE_NAME, SQLITE_DB_FILE
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
 
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-SQLITE_DB_FILE = os.getenv('SQLITE_DB_FILE')
-SQL_TABLE_NAME = os.getenv('SQL_TABLE_NAME')
+SQLITE_DB_FILE = os.getenv('SQLITE_DB_FILE','./uploads/resumes.db')
+SQL_TABLE_NAME = os.getenv('SQL_TABLE_NAME', 'resumes')
 
 # Fetch data from SQLite
-def fetch_data_from_sqlite(db_file: Path, table_name: str) -> Optional[pd.DataFrame]:
+def fetch_data_from_sqlite(db_file, table_name: str) -> Optional[pd.DataFrame]:
     """Fetch data from a SQLite database table.
 
     Args:
@@ -27,6 +27,7 @@ def fetch_data_from_sqlite(db_file: Path, table_name: str) -> Optional[pd.DataFr
         Optional[pd.DataFrame]: A DataFrame containing the data from the table, or None if an error occurred.
     """
     try:
+        print(db_file)
         conn = sqlite3.connect(db_file)
         query = f"SELECT * FROM {table_name}"
         df = pd.read_sql_query(query, conn)
@@ -36,24 +37,6 @@ def fetch_data_from_sqlite(db_file: Path, table_name: str) -> Optional[pd.DataFr
         return None  # Return an empty DataFrame on error
      
     return df
-
-# def generate_sample_data(dataframe: pd.DataFrame) -> List[str]:
-#     """Generate sample data for each column in the DataFrame.
-
-#     Args:
-#         dataframe (pd.DataFrame): The DataFrame containing the data.
-
-#     Returns:
-#         List[str]: A list of strings containing the column name, sample data, and data type.
-#     """
-#     sample_data_list = []
-#     for column in dataframe.columns:
-#         col_data = dataframe[column]
-#         col_type = col_data.dtype
-#         sample_data = col_data.dropna().sample(min(5, len(col_data))).tolist()
-#         sample_data_str = ', '.join(map(str, sample_data))
-#         sample_data_list.append(f"{column}: {sample_data_str}, {col_type}")
-#     return sample_data_list
 
 def get_column_descriptions(dataframe, input_text) -> dict:
     """Get column descriptions from OpenAI API."""
@@ -66,8 +49,7 @@ def get_column_descriptions(dataframe, input_text) -> dict:
         col_type = col_data.dtype
         sample_data = dataframe[column].dropna().sample(min(5, len(dataframe[column]))).tolist()
         sample_data_str = ', '.join(map(str, sample_data))
-        sample_data_str = sample_data_str.replace("{", "'")
-        sample_data_str = sample_data_str.replace("}", "'")
+        sample_data_str = re.sub(r"{|}", "'", sample_data_str)
         # Convert column to string
         column = str(column)
         # Prepare the prompt
@@ -158,14 +140,11 @@ def store_descriptions_in_db(descriptions, numerical_columns, categorical_column
     conn.commit()
     conn.close()
 
-df = fetch_data_from_sqlite(db_file=Path(SQLITE_DB_FILE),table_name=SQL_TABLE_NAME)
+df = fetch_data_from_sqlite(db_file=SQLITE_DB_FILE,table_name=SQL_TABLE_NAME)
 
 if df is None:
     print("Error fetching data from SQLite.")
     raise Exception("Error fetching data from SQLite.")
-
-# Generate sample data for each column
-# sample_data_list = generate_sample_data(dataframe=df)
 
 # Get column descriptions
 column_descriptions = get_column_descriptions(dataframe=df, input_text="Please provide a detailed description of each column in the given dataset.")
