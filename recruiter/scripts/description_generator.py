@@ -9,6 +9,8 @@ from typing import Optional, List
 import os
 from dotenv import load_dotenv
 
+from recruiter.nlqs.database.database_utils import fetch_data_from_sqlite
+
 load_dotenv()
 
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
@@ -16,29 +18,29 @@ SQLITE_DB_FILE = os.getenv('SQLITE_DB_FILE','./uploads/resumes.db')
 SQL_TABLE_NAME = os.getenv('SQL_TABLE_NAME', 'resumes')
 
 # Fetch data from SQLite
-def fetch_data_from_sqlite(db_file, table_name: str) -> Optional[pd.DataFrame]:
-    """Fetch data from a SQLite database table.
+# def fetch_data_from_sqlite(db_file, table_name: str) -> Optional[pd.DataFrame]:
+#     """Fetch data from a SQLite database table.
 
-    Args:
-        db_file (Path): Path to the SQLite database file.
-        table_name (str): Name of the table to fetch data from.
+#     Args:
+#         db_file (Path): Path to the SQLite database file.
+#         table_name (str): Name of the table to fetch data from.
 
-    Returns:
-        Optional[pd.DataFrame]: A DataFrame containing the data from the table, or None if an error occurred.
-    """
-    try:
-        print(db_file)
-        conn = sqlite3.connect(db_file)
-        query = f"SELECT * FROM {table_name}"
-        df = pd.read_sql_query(query, conn)
-        conn.close()
-    except sqlite3.Error as e:
-        print(f"Error fetching data: {e}")
-        return None  # Return an empty DataFrame on error
+#     Returns:
+#         Optional[pd.DataFrame]: A DataFrame containing the data from the table, or None if an error occurred.
+#     """
+#     try:
+#         print(db_file)
+#         conn = sqlite3.connect(db_file)
+#         query = f"SELECT * FROM {table_name}"
+#         df = pd.read_sql_query(query, conn)
+#         conn.close()
+#     except sqlite3.Error as e:
+#         print(f"Error fetching data: {e}")
+#         return None  # Return an empty DataFrame on error
      
-    return df
+#     return df
 
-def get_column_descriptions(dataframe, input_text) -> dict:
+def get_column_descriptions(dataframe) -> dict:
     """Get column descriptions from OpenAI API."""
     # Initialize an empty dictionary to store column descriptions
     descriptions = {}
@@ -88,7 +90,7 @@ def get_column_descriptions(dataframe, input_text) -> dict:
         chain = LLMChain(prompt=prompt, llm=llm)
         
         # Generate the description
-        response = chain.run(input_text)
+        response = chain.run("Please provide a detailed description of each column in the given dataset.")
         
         # Extract the description from the response
         description = response.strip()
@@ -140,21 +142,24 @@ def store_descriptions_in_db(descriptions, numerical_columns, categorical_column
     conn.commit()
     conn.close()
 
-df = fetch_data_from_sqlite(db_file=SQLITE_DB_FILE,table_name=SQL_TABLE_NAME)
+def generate_column_description():
+    df = fetch_data_from_sqlite(db_file=SQLITE_DB_FILE, table_name=SQL_TABLE_NAME)
 
-if df is None:
-    print("Error fetching data from SQLite.")
-    raise Exception("Error fetching data from SQLite.")
+    if df is None:
+        print("Error fetching data from SQLite.")
+        raise Exception("Error fetching data from SQLite.")
 
-# Get column descriptions
-column_descriptions = get_column_descriptions(dataframe=df, input_text="Please provide a detailed description of each column in the given dataset.")
+    # Get column descriptions
+    column_descriptions = get_column_descriptions(dataframe=df)
 
-# Identify numerical and categorical columns
-numerical_columns = df.select_dtypes(include=['int64', 'float64']).columns.tolist()
-categorical_columns = df.select_dtypes(include=['object']).columns.tolist()
+    # Identify numerical and categorical columns
+    numerical_columns = df.select_dtypes(include=["int64", "float64"]).columns.tolist()
+    categorical_columns = df.select_dtypes(include=["object"]).columns.tolist()
 
-# Store descriptions and column types in the database
-store_descriptions_in_db(descriptions=column_descriptions, numerical_columns=numerical_columns, categorical_columns=categorical_columns)
+    # Store descriptions and column types in the database
+    store_descriptions_in_db(
+        descriptions=column_descriptions, numerical_columns=numerical_columns, categorical_columns=categorical_columns
+    )
 
-print(column_descriptions)
-print("Column descriptions and column types stored in the database.")
+    print(column_descriptions)
+    print("Column descriptions and column types stored in the database.")

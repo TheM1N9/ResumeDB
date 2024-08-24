@@ -9,15 +9,17 @@ from recruiter.nlqs.workflow import main_workflow
 
 def main():
     # Gradio interface
-    with gr.Blocks(title="Chatbot using OpenAI") as demo:
-        gr.Markdown("# Chatbot using OpenAI")
+    with gr.Blocks(title="ResumeDB") as demo:
+        gr.Markdown("# ResumeDB")
 
         chatbot = gr.Chatbot([], elem_id="chatbot", height=700)
         msg = gr.Textbox(show_copy_button=True)
+        btn = gr.Button("Send")
 
-        clear = gr.ClearButton([msg, chatbot])
+        # clear = gr.ClearButton([msg, chatbot])
 
         msg.submit(main_workflow, [msg, chatbot], [msg, chatbot])
+        btn.click(main_workflow, [msg, chatbot], [msg, chatbot])
 
     # Launch the interface
         try:

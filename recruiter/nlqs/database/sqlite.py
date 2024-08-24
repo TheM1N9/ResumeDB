@@ -60,22 +60,26 @@ def retrieve_descriptions_and_types_from_db(db_file: str= SQLITE_DB_FILE) -> Tup
     Returns:
         tuple: Return descriptions, numerical_columns, categorial_columns
     """
-    conn = sqlite3.connect(db_file)
-    c = conn.cursor()
+    try:
+        conn = sqlite3.connect(db_file)
+        c = conn.cursor()
 
-    # Retrieve descriptions
-    c.execute('SELECT column_name, description FROM column_descriptions')
-    description_rows = c.fetchall()
-    descriptions = {row[0]: row[1] for row in description_rows}
+        # Retrieve descriptions
+        c.execute('SELECT column_name, description FROM column_descriptions')
+        description_rows = c.fetchall()
+        descriptions = {row[0]: row[1] for row in description_rows}
 
-    # Retrieve column types
-    c.execute('SELECT column_name, column_type FROM column_types')
-    type_rows = c.fetchall()
-    numerical_columns = [row[0] for row in type_rows if row[1] == 'numerical']
-    categorical_columns = [row[0] for row in type_rows if row[1] == 'categorical']
+        # Retrieve column types
+        c.execute('SELECT column_name, column_type FROM column_types')
+        type_rows = c.fetchall()
+        numerical_columns = [row[0] for row in type_rows if row[1] == 'numerical']
+        categorical_columns = [row[0] for row in type_rows if row[1] == 'categorical']
 
-    conn.close()
-    return descriptions, numerical_columns, categorical_columns
+        conn.close()
+        return descriptions, numerical_columns, categorical_columns
+    except sqlite3.Error as e:
+        print(f"Error retrieving descriptions and types from database: {e}")
+        return {}, [], []
 
 def validate_query(query: str, db_file: str = SQLITE_DB_FILE) -> bool:
     """ Validates the generated SQL query against the database schema and returns True if valid, False otherwise.

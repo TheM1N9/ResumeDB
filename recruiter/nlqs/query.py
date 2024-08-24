@@ -1,18 +1,14 @@
+import re
 from typing import List, Dict, Tuple
 import json
-from xml.dom.minidom import Document
 import logging
 from dataclasses import dataclass
 from langchain.memory import ConversationBufferMemory
 from langchain_core.prompts import PromptTemplate
 from langchain.chains import LLMChain
 from langchain_community.chat_models import ChatOpenAI
-from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import Chroma
-from langchain_community.document_loaders.csv_loader import CSVLoader
 from pandas import DataFrame
-from pydantic.v1 import SecretStr
-from langchain.schema import Document
 import chromadb
 import os
 from dotenv import load_dotenv
@@ -21,11 +17,11 @@ from recruiter.nlqs.database.database_utils import fetch_data_from_sqlite
 
 load_dotenv()
 
-OPENAI_API_KEY =  os.getenv("OPENAI_API_KEY")
-SQLITE_DB_FILE = os.getenv("SQLITE_DB_FILE", './uploads/resumes.db')
-SQL_TABLE_NAME = os.getenv("SQL_TABLE_NAME", 'resumes')
-LOGGER_FILE = os.getenv("LOGGER_FILE", 'chatbot.log')
-CHROMA_COLLECTION_NAME = os.getenv("CHROMA_COLLECTION_NAME", 'my_collection1')
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+SQLITE_DB_FILE = os.getenv("SQLITE_DB_FILE", "./uploads/resumes.db")
+SQL_TABLE_NAME = os.getenv("SQL_TABLE_NAME", "resumes")
+LOGGER_FILE = os.getenv("LOGGER_FILE", "chatbot.log")
+CHROMA_COLLECTION_NAME = os.getenv("CHROMA_COLLECTION_NAME", "my_collection1")
 
 
 # Create a logger object
@@ -46,19 +42,23 @@ file_handler.setFormatter(formatter)
 # Add the file handler to the logger
 logger.addHandler(file_handler)
 
+
 @dataclass
 class SummarizedInput:
-    """ Class to represent the summarized input. """
+    """Class to represent the summarized input."""
+
     summary: str
     quantitative_data: Dict[str, str]
     qualitative_data: Dict[str, str]
     user_requested_columns: List[str]
     user_intent: str
 
+
 # class Query:
 
 #     def __init__(self) -> None:
 #         self.column_descriptions, self.numerical_columns, self.categorical_columns = retrieve_descriptions_and_types_from_db()
+
 
 def get_chroma_collections() -> Chroma:
     """Get or create a chroma collection.
@@ -66,31 +66,45 @@ def get_chroma_collections() -> Chroma:
     Returns:
         Chroma: chroma collection.
     """
-    chroma_client = chromadb.PersistentClient(path='./chroma')
+    chroma_client = chromadb.PersistentClient(path="./chroma")
     collection_name = CHROMA_COLLECTION_NAME
     collections = [col.name for col in chroma_client.list_collections()]
-    print(collections)
 
     if collection_name in collections:
-            print(f"Collection '{collection_name}' already exists, getting existing collection...")
-            chroma_collection = chroma_client.get_collection(collection_name)
+        print(
+            f"Collection '{collection_name}' already exists, getting existing collection..."
+        )
+        chroma_collection = chroma_client.get_collection(collection_name)
     else:
-            print("Creating new collection...")
-            collection = chroma_client.create_collection(collection_name)
+        print("Creating new collection...")
+        collection = chroma_client.create_collection(collection_name)
 
-            data: DataFrame = fetch_data_from_sqlite(db_file=SQLITE_DB_FILE, table_name=SQL_TABLE_NAME)
+        data: DataFrame = fetch_data_from_sqlite(
+            db_file=SQLITE_DB_FILE, table_name=SQL_TABLE_NAME
+        )
 
-            data['combined_text'] = data[['name', 'skills', 'projects', 'certifications']].apply(lambda x: ' '.join(x.dropna().astype(str)), axis=1)
-            texts = data['combined_text'].tolist()
-            data['meta_data'] = data[['contact_details','education','experience','achievements']].apply(lambda x: ' '.join(x.dropna().astype(str)), axis=1)
-            metadata = data['meta_data'].tolist()
+        data["combined_text"] = data[
+            ["name", "skills", "projects", "certifications"]
+        ].apply(lambda x: " ".join(x.dropna().astype(str)), axis=1)
+        texts = data["combined_text"].tolist()
+        data["meta_data"] = data[
+            ["contact_details", "education", "experience", "achievements"]
+        ].apply(lambda x: " ".join(x.dropna().astype(str)), axis=1)
+        metadata = data["meta_data"].tolist()
 
-            for text,pro,meta in zip(texts,data['id'],metadata):
-                chroma_collection = collection.add(documents=text, ids=pro, metadatas={"student details: 'contact_details','education','experience','achievements'": meta})
+        for text, pro, meta in zip(texts, data["id"], metadata):
+            chroma_collection = collection.add(
+                documents=text,
+                ids=pro,
+                metadatas={
+                    "student details: 'contact_details','education','experience','achievements'": meta
+                },
+            )
 
-            chroma_collection = chroma_client.get_collection(collection_name)
+        chroma_collection = chroma_client.get_collection(collection_name)
 
-    return chroma_collection
+    return chroma_collection  # type: ignore
+
 
 # Initializes the ChatOpenAI LLM model
 llm = ChatOpenAI(temperature=0, model="gpt-4", api_key=OPENAI_API_KEY, max_tokens=1000)
@@ -98,8 +112,9 @@ llm = ChatOpenAI(temperature=0, model="gpt-4", api_key=OPENAI_API_KEY, max_token
 # Default system prompt for the LLM.
 DEFAULT_SYSTEM_PROMPT = "You are a professional medical assistant, adept at handling inquiries related to medical products."
 
+
 # Generates a prompt for the LLM based on the instruction and system prompt.
-def get_prompt(instruction:str , system_prompt:str=DEFAULT_SYSTEM_PROMPT) -> str:
+def get_prompt(instruction: str, system_prompt: str = DEFAULT_SYSTEM_PROMPT) -> str:
     """Generates the prompt for the LLM.
 
     Args:
@@ -113,19 +128,27 @@ def get_prompt(instruction:str , system_prompt:str=DEFAULT_SYSTEM_PROMPT) -> str
     SYSTEM_PROMPT = f"<<SYS>>\n{system_prompt}\n<</SYS>>\n\n"
     return f"[INST]{SYSTEM_PROMPT}{instruction}[/INST]"
 
+
 def list_of_tuples_to_string(tuples: List[Tuple[str, str]]) -> str:
-  """Converts a list of tuples of strings into a single string.
+    """Converts a list of tuples of strings into a single string.
 
-  Args:
-    tuples: A list of tuples, where each tuple contains two strings.
+    Args:
+      tuples: A list of tuples, where each tuple contains two strings.
 
-  Returns:
-    A string representation of the list of tuples.
-  """
-  return '\n'.join(f"{user_input}: {response}" for user_input, response in tuples)
+    Returns:
+      A string representation of the list of tuples.
+    """
+    return "\n".join(f"{user_input}: {response}" for user_input, response in tuples)
+
 
 # Function to identify qualitative and quantitative data and user intent
-def summarize(user_input:str, chat_history:List[Tuple[str, str]], column_descriptions_dictionary:Dict[str,str], numerical_columns:List[str], categorical_columns:List[str]) -> SummarizedInput:
+def summarize(
+    user_input: str,
+    chat_history: List[Tuple[str, str]],
+    column_descriptions_dictionary: Dict[str, str],
+    numerical_columns: List[str],
+    categorical_columns: List[str],
+) -> SummarizedInput:
     """Summarizes the user input and returns the summary, quantitative data, and qualitative data, along with the user requested columns in a JSON format.
 
     Args:
@@ -137,41 +160,47 @@ def summarize(user_input:str, chat_history:List[Tuple[str, str]], column_descrip
 
     Returns:
         dict: {
-            "summary": str, 
+            "summary": str,
             "quantitative_data": {
-                "column name": str, 
-                "column name": str, 
                 "column name": str,
-            }, 
+                "column name": str,
+                "column name": str,
+            },
             "qualitative_data": {
-                "column name": str, 
-                "column name": str, 
                 "column name": str,
-            }, 
+                "column name": str,
+                "column name": str,
+            },
             "user_requested_columns": list,
             "user_intent":str,
         }
     """
-    
+
     column_descriptions = list(column_descriptions_dictionary.items())
     chat_history_str = list_of_tuples_to_string(chat_history)
-    chat_history_str = chat_history_str.replace("{","'")
-    chat_history_str = chat_history_str.replace("}","'")
+    chat_history_str = re.sub(r"{|}", "'", chat_history_str)
 
     # Summarize the user input
-    instruction =  f"""
-    You will receive a user input and the chat history. 
-    the user input will have job description or job requirements. break down the job description or job requirements into simple terms.
-    Your task is to:
-    1. Analyze the user input and identify key details based on our available data and chat history.
-    2. Summarize the input, classifying the data into qualitative and quantitative categories.
-    3. Identify relevant columns from which we can provide an answer. Pay close attention to the user's intent and specific mentions of data columns:
+    instruction = f"""
+    You will receive a user input and the chat history. Your task is to:
+    
+    1. **Single-Word Queries**: If the user input is a single word or very short (e.g., one or two words), provide a direct response if possible. If the query is unclear, prompt the user to elaborate.
+       - Example response: "It seems you're asking about something specific. Could you provide more details?"
+
+    2. **Structured Analysis**: For all other inputs, analyze the user input and identify key details based on our available data and chat history.
+    
+    3. Summarize the input, classifying the data into qualitative and quantitative categories.
+    
+    4. Identify relevant columns from which we can provide an answer. Pay close attention to the user's intent and specific mentions of data columns:
        - Are they seeking information about candidates with the skills the user has provided.
        - If the user is seeking information about skill and other details of the resume data we have provide the ID and the name of the candidate.
        - Look for explicit mentions of column names, synonyms, or phrases that indicate the type of information requested. If the user specifies certain attributes or metrics, consider these as user-requested columns.
-    4. Classify the user's intent. Possible intents include: phatic_communication, sql_injection, profanity, and other.
-    5. Output the result in a JSON format.
-    6. Do not output any other information except the JSON. Do not add [OUT], [/OUT] to the output.(!important)
+
+    5. Classify the user's intent. Possible intents include: phatic_communication, sql_injection, profanity, and other.
+
+    6. Output the result in a JSON format.
+
+    7. Do not output any other information except the JSON. Do not add [OUT], [/OUT] to the output.(!important)
     
     The output JSON should have the following structure:
 
@@ -196,20 +225,26 @@ def summarize(user_input:str, chat_history:List[Tuple[str, str]], column_descrip
     Data:{column_descriptions}\n\n 
     numerical columns in the data: {numerical_columns}\n\n 
     descriptive columns in the data: {categorical_columns}\n\n 
-    Chat history: {chat_history_str}
+    Chat history: {chat_history}
 
     Now, summarize the user input and provide the structured output in JSON format.
     """
+
     system_prompt = "You are a perfect HR assistant in a company you need to selct the best candidates for a job. You are an expert in summarization and expressing key ideas succinctly."
     prompt = get_prompt(instruction, system_prompt)
-    prompt_template = PromptTemplate(template=prompt, input_variables=["chat_history", "user_input"])
+    prompt_template = PromptTemplate(
+        template=prompt, input_variables=["chat_history", "user_input"]
+    )
     memory = ConversationBufferMemory(memory_key="chat_history")
 
     llm_chain = LLMChain(llm=llm, prompt=prompt_template, verbose=True, memory=memory)
-    
-    summarized_input_str = llm_chain.run({"chat_history": chat_history, "user_input": user_input})
-    # print(f"summarized input str: {summarized_input_str}")
-    # summarized_input_str = summarized_input_str.replace("[OUT]","")
+
+    summarized_input_str = llm_chain.run(
+        {"chat_history": chat_history, "user_input": user_input}
+    )
+    print(f"summarized input str: {summarized_input_str}")
+    summarized_input_str = summarized_input_str.replace("[OUT]", "")
+    summarized_input_str = summarized_input_str.replace("[/OUT]", "")
     try:
         # Attempt to parse the summarized input as JSON
         summarized_input_dict = json.loads(summarized_input_str)
@@ -228,13 +263,14 @@ def summarize(user_input:str, chat_history:List[Tuple[str, str]], column_descrip
         quantitative_data=summarized_input_dict.get("quantitative_data", {}),
         qualitative_data=summarized_input_dict.get("qualitative_data", {}),
         user_requested_columns=summarized_input_dict.get("user_requested_columns", []),
-        user_intent=summarized_input_dict.get("user_intent", "")
+        user_intent=summarized_input_dict.get("user_intent", ""),
     )
 
     return summarized_input
 
+
 # Function to perform a similarity search
-def similarity_search(collection: Chroma, user_input:str) -> str:
+def similarity_search(user_input: str) -> str:
     """Performs a similarity search on the database and returns the first similar result.
 
     Args:
@@ -244,11 +280,23 @@ def similarity_search(collection: Chroma, user_input:str) -> str:
         str: the first similar result.
 
     """
-    result = collection.query(query_texts=user_input, n_results=3, include=['documents', 'metadatas'])
+    chroma_client = chromadb.PersistentClient(path="./chroma")
+    collection_name = CHROMA_COLLECTION_NAME
+    collections = [col.name for col in chroma_client.list_collections()]
+
+    # Create or get existing collection
+    if collection_name in collections:
+        chroma_collection = chroma_client.get_collection(collection_name)
+    else:
+        chroma_collection = chroma_client.get_or_create_collection(collection_name)
+        print(f"New collection '{collection_name}' created.")
+
+    result = chroma_collection.query(
+        query_texts=user_input, n_results=3, include=["documents", "metadatas"]
+    )
     if result:
         result_str = str(result)
-        result_str = result_str.replace("{", "")
-        result_str = result_str.replace("}", '"')
+        result_str = re.sub(r"{|}", "`", result_str)
         logger.info(f"Result: {result_str}")
         return result_str
     else:
@@ -257,7 +305,14 @@ def similarity_search(collection: Chroma, user_input:str) -> str:
 
 
 # Function to generate a response based on the user input
-def generate_query(user_input:str, summarized_input: SummarizedInput, chat_history:List[Tuple[str, str]], column_descriptions:Dict[str,str], numerical_columns:List[str], categorical_columns:List[str]) -> str:
+def generate_query(
+    user_input: str,
+    summarized_input: SummarizedInput,
+    chat_history: List[Tuple[str, str]],
+    column_descriptions: Dict[str, str],
+    numerical_columns: List[str],
+    categorical_columns: List[str],
+) -> str:
     """Generates an SQL query based on the user input and chat history.
 
     Args:
@@ -275,11 +330,10 @@ def generate_query(user_input:str, summarized_input: SummarizedInput, chat_histo
     qualitative_data = list(summarized_input.qualitative_data.items())
     user_requested_columns = summarized_input.user_requested_columns
     chat_history_str = list_of_tuples_to_string(chat_history)
-    chat_history_str = chat_history_str.replace("{","'")
-    chat_history_str = chat_history_str.replace("}","'")
+    chat_history_str = re.sub(r"{|}", "'", chat_history_str)
 
     instruction = f"""
-    You will receive a user input and the chat history. 
+    You will receive a user input and the chat history. Do not make answers on your own.
     the user input will have job description or job requirements. break down the job description or job requirements into simple terms.
     Generate an SQLite query based on the user input and other data. For numerical columns, use exact matches. 
     For descriptive columns, use 'LIKE' for partial matches but handle possible spelling mistakes and close matches. 
@@ -305,17 +359,24 @@ def generate_query(user_input:str, summarized_input: SummarizedInput, chat_histo
 
     system_prompt = "You are a perfect HR assistant in a company you need to selct the best candidates for a job. You are an expert in SQL queries. Create robust queries based on the user requirements and database schema."
     prompt = get_prompt(instruction, system_prompt)
-    prompt_template = PromptTemplate(template=prompt, input_variables=["chat_history", "user_input"])
+    prompt_template = PromptTemplate(
+        template=prompt, input_variables=["chat_history", "user_input"]
+    )
     memory = ConversationBufferMemory(memory_key="chat_history")
 
     llm_chain = LLMChain(llm=llm, prompt=prompt_template, verbose=True, memory=memory)
 
-    query = llm_chain.run({"chat_history": chat_history, "user_input": user_input}).strip()
+    query = llm_chain.run(
+        {"chat_history": chat_history, "user_input": user_input}
+    ).strip()
     logger.info(f"Query: {query}")
 
     return query
 
-def generate_response(user_input:str, query_result:str, chat_history:List[Tuple[str, str]]) -> str:
+
+def generate_response(
+    user_input: str, query_result: str, chat_history: List[Tuple[str, str]]
+) -> str:
     """Generates a response based on the user input and the query result.
 
     Args:
@@ -327,19 +388,27 @@ def generate_response(user_input:str, query_result:str, chat_history:List[Tuple[
         str: The response.
     """
 
-    query_result_str = query_result.replace("{","'")
-    query_result_str = query_result_str.replace("}","'")
-    
-    instruction = f"""Provide an answer based on the user input and the data retrieved from the database. 
-    The link for the resumes is "http://localhost:5000/uploads/'id'". Do not add ' before and after the id of the resume.
-    Also talk about the data you received.
+    query_result_str = re.sub(r"{|}", "'", query_result)
+
+    system_prompt = """You are a perfect Automated Tracking System. Your task is to provide an answer based on the user input and the data retrieved from the database."""
+
+    instruction = f"""When the user input is a greeting (e.g., "hello", "hi", "hey"), start with a friendly greeting and then proceed to provide the relevant information if necessary. 
+    Provide an answer based on the user input and the data retrieved from the database. 
+    The link for the resumes is "http://localhost:5000/uploads/id". Do not add ' before and after the id of the resume.
+    Also, briefly summarize and discuss the data you received before addressing the specific user query.
+    Do not make answers on your own.
+
     User input: {user_input}\n\ndata : {query_result_str}\n\nChat history: {chat_history}"""
-    system_prompt = "You are a perfect Automated tracking system. Your task is to provide an answer based on the user input and the data retrieved from the database."
+
     prompt = get_prompt(instruction, system_prompt)
-    prompt_template = PromptTemplate(template=prompt, input_variables=["chat_history", "user_input"])
+    prompt_template = PromptTemplate(
+        template=prompt, input_variables=["chat_history", "user_input"]
+    )
     memory = ConversationBufferMemory(memory_key="chat_history")
 
     llm_chain = LLMChain(llm=llm, prompt=prompt_template, verbose=True, memory=memory)
-    response = llm_chain.run({"chat_history": chat_history, "user_input": query_result_str})
-    
+    response = llm_chain.run(
+        {"chat_history": chat_history, "user_input": query_result_str}
+    )
+
     return response

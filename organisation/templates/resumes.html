@@ -66,6 +66,60 @@
       .back-link a:hover {
         text-decoration: underline;
       }
+
+      button {
+        background-color: #2980b9;
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 5px;
+        font-size: 16px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+        display: block;
+        margin: 20px auto;
+        max-width: 200px;
+      }
+
+      button:hover {
+        background-color: #21618c;
+      }
+
+      /* ... (rest of your CSS) ... */
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.pagination a {
+  display: inline-block;
+  padding: 8px 12px;
+  margin: 0 5px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  text-decoration: none;
+  color: #333;
+  font-weight: bold;
+}
+
+.pagination a:hover {
+  background-color: #2980b9;
+  color: #fff;
+}
+
+.pagination strong {
+  display: inline-block;
+  padding: 8px 12px;
+  margin: 0 5px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  background-color: #2980b9;
+  color: #fff;
+  font-weight: bold;
+}
+      
     </style>
   </head>
   <body>
@@ -77,6 +131,28 @@
       </a>
       {% endfor %}
     </ul>
+
+  <div class="pagination">
+    {% if page > 1 %}
+        <a href="{{ url_for('list_resumes', page=page-1) }}">Previous</a>
+    {% endif %}
+
+    {% for p in range(1, total_pages + 1) %}
+        {% if p == page %}
+            <strong>{{ p }}</strong>
+        {% else %}
+            <a href="{{ url_for('list_resumes', page=p) }}">{{ p }}</a>
+        {% endif %}
+    {% endfor %}
+
+    {% if page < total_pages %}
+        <a href="{{ url_for('list_resumes', page=page+1) }}">Next</a>
+    {% endif %}
+</div>
+
+    <a href="{{ url_for('download_data') }}">
+      <button>Download data</button>
+    </a>
     <div class="back-link">
       <a href="{{ url_for('index') }}">Back to upload</a>
     </div>

@@ -1,1 +1,0 @@
-print("this is not a good code")
