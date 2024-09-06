@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chat with Resume</title>
+    <style>
+      /* static/styles.css */
+      .chat-container {
+        width: 50%;
+        margin: 0 auto;
+        background-color: #f4f4f4;
+        border-radius: 5px;
+        padding: 20px;
+        box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+      }
+
+      #chat-box {
+        max-height: 400px;
+        overflow-y: auto;
+        margin-bottom: 20px;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+      }
+
+      .user {
+        text-align: right;
+        margin: 10px 0;
+      }
+
+      .bot {
+        text-align: left;
+        margin: 10px 0;
+      }
+
+      #chat-form {
+        display: flex;
+        justify-content: space-between;
+      }
+
+      #query {
+        width: 80%;
+        padding: 10px;
+        border-radius: 5px;
+        border: 1px solid #ccc;
+      }
+
+      button {
+        padding: 10px 20px;
+        background-color: #007bff;
+        color: #fff;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+
+      button:hover {
+        background-color: #0056b3;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="chat-container">
+      <div id="chat-box">
+        {% for message in messages %}
+        <div class="{{ message['type'] }}">
+          <p>{{ message['text'] }}</p>
+        </div>
+        {% endfor %}
+      </div>
+      <form id="chat-form" method="post">
+        <input
+          type="text"
+          name="query"
+          id="query"
+          placeholder="Ask about the resume..."
+          required
+        />
+        <button type="submit">Send</button>
+      </form>
+    </div>
+    <script>
+      const chatBox = document.getElementById("chat-box");
+      const chatForm = document.getElementById("chat-form");
+      const queryInput = document.getElementById("query");
+
+      // Function to scroll to the bottom of the chat box
+      function scrollToBottom() {
+        chatBox.scrollTop = chatBox.scrollHeight;
+      }
+
+      // Function to add a message to the chat box
+      function addMessage(type, text) {
+        const messageDiv = document.createElement("div");
+        messageDiv.classList.add(type);
+        messageDiv.innerHTML = `<p>${text}</p>`;
+        chatBox.appendChild(messageDiv);
+        scrollToBottom(); // Scroll to the bottom after adding the message
+      }
+
+      // Event listener for form submission
+      chatForm.addEventListener("submit", (event) => {
+        event.preventDefault(); // Prevent default form submission
+
+        const userQuery = queryInput.value;
+        addMessage("user", userQuery); // Add user message to the chat box
+        queryInput.value = ""; // Clear the input field
+
+        // Send the user query to the Flask server (using AJAX)
+        fetch('{{ url_for("chat") }}', {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "X-Requested-With": "XMLHttpRequest", // Indicate it's an AJAX request
+          },
+          body: new URLSearchParams({ query: userQuery }),
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            // Add the bot's response to the chat box
+            addMessage("bot", data.response);
+          })
+          .catch((error) => {
+            console.error("Error:", error);
+            addMessage(
+              "bot",
+              "Sorry, an error occurred. Please try again later."
+            );
+          });
+      });
+
+      // Scroll to the bottom on page load
+      scrollToBottom();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ResumeDB - Welcome</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* Reset and Base Styles */
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Poppins", sans-serif;
+        line-height: 1.6;
+        color: #333;
+        background-color: #f7f8fc;
+      }
+
+      /* Navigation */
+      header nav {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 5%;
+        background-color: #fff;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      .logo {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #007bff;
+      }
+
+      nav ul {
+        list-style: none;
+      }
+
+      nav ul li {
+        display: inline;
+      }
+
+      nav ul li a {
+        color: #007bff;
+        text-decoration: none;
+        padding: 0.5rem 1rem;
+        font-weight: 500;
+      }
+
+      nav ul li a.login-btn {
+        background-color: #007bff;
+        color: #fff;
+        border-radius: 5px;
+        transition: background-color 0.3s ease;
+      }
+
+      nav ul li a.login-btn:hover {
+        background-color: #0056b3;
+      }
+
+      /* Welcome Section */
+      .welcome-section {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 5rem 10%;
+        background: linear-gradient(to right, #007bff, #00c6ff);
+        color: #fff;
+        min-height: 80vh;
+      }
+
+      .content {
+        max-width: 50%;
+      }
+
+      .content h1 {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+      }
+
+      .content p {
+        font-size: 1.2rem;
+        margin-bottom: 2rem;
+      }
+
+      .buttons {
+        display: flex;
+        gap: 1rem;
+      }
+
+      .buttons .btn {
+        padding: 1rem 2rem;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        text-decoration: none;
+        font-size: 1rem;
+        transition: transform 0.2s ease;
+      }
+
+      .buttons .primary-btn {
+        background-color: #28a745;
+        color: #fff;
+      }
+
+      .buttons .secondary-btn {
+        background-color: #6c757d;
+        color: #fff;
+      }
+
+      .buttons .btn:hover {
+        transform: scale(1.05);
+      }
+
+      .image-container {
+        max-width: 40%;
+      }
+
+      .image-container img {
+        width: auto;
+        height: 400px;
+      }
+
+      /* Footer */
+      footer {
+        text-align: center;
+        padding: 2rem 0;
+        background-color: #f7f8fc;
+      }
+
+      footer p {
+        color: #6c757d;
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+
+  <body>
+    <header>
+      <nav>
+        <div class="logo">ResumeDB</div>
+        <ul>
+          <!-- <a href="{{ url_for('signup') }}">Signup</a> -->
+          <!-- <a href="{{ url_for('login') }}">Login</a> -->
+          <li>
+            <a href="{{ url_for('login') }}" class="btn login-btn">Login</a>
+          </li>
+          <li>
+            <a href="{{ url_for('signup')}}" class="btn login-btn">Signup</a>
+          </li>
+        </ul>
+      </nav>
+    </header>
+
+    <section class="welcome-section">
+      <div class="content">
+        <h1>Welcome to ResumeDB</h1>
+        <p>
+          Your ultimate solution for smart, efficient, and accurate resume
+          management.
+        </p>
+        <div class="buttons">
+          <a href="/upload" class="btn primary-btn">Upload Resume</a>
+          <a href="/chat" class="btn secondary-btn">Start Chat</a>
+        </div>
+      </div>
+      <div class="image-container">
+        <img
+          src="static/images/resume_Picture.png"
+          alt="Resume Management Illustration"
+        />
+      </div>
+    </section>
+
+    <button><a href="{{ url_for('logout') }}">logout</a></button>
+
+    <footer>
+      <p>© 2024 ResumeDB. All rights reserved.</p>
+    </footer>
+  </body>
+</html>

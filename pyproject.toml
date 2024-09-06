@@ -6,9 +6,9 @@ authors = ["them1n9 <iamanidiotm@gmail.com>"]
 readme = "README.md"
 
 packages = [
-    { include = "./recruiter/nlqs" },
-    { include = "./recruiter/scripts" },
-    { include = "./recruiter/nlqs/database" }
+    { include = "./nlqs" },
+    { include = "./scripts" },
+    { include = "./nlqs/database" }
 ]
 
 [tool.poetry.dependencies]
@@ -19,14 +19,18 @@ langchain-openai = "^0.1.13"
 langchain-community = "^0.2.6"
 python-dotenv = "^1.0.1"
 sqlalchemy = "^2.0.31"
-
-
 gradio = "^4.37.2"
 chromadb = "^0.5.3"
 pandas = "^2.2.2"
+psycopg2-binary = "^2.9.9"
+flask-sqlalchemy = "^3.1.1"
+flask-login = "^0.6.3"
+werkzeug = "^3.0.4"
+
+filetype = "^1.2.0"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
-start-bot = "recruiter.server:run_server"
+resumedb = "app:run"
