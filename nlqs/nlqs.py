@@ -225,7 +225,7 @@ class NLQS:
 
                 print(intersection_ids)
 
-                final_query = f"select * from {driver.db_config.dataset_table_name} where {primary_key} in ({','.join(f'\"{id}\"' for id in intersection_ids)})"
+                final_query = f"""select * from {driver.db_config.dataset_table_name} where {primary_key} in ({','.join(f'"{id}"' for id in intersection_ids)})"""
 
                 # columns_database = driver.database_columns()
 
