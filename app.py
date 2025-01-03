@@ -14,13 +14,17 @@ from flask import (
     send_from_directory,
     make_response,
     session,
+    jsonify,
+    request,
 )
-from pydantic.v1 import SecretStr
+from pydantic import SecretStr
 from werkzeug.utils import secure_filename
 from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from langchain_openai import ChatOpenAI
+
+# from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from dataclasses import dataclass
 from typing import Dict, List
 from dotenv import load_dotenv
@@ -38,6 +42,7 @@ from flask_login import (
 import filetype
 from nlqs.database.sqlite import SQLiteConnectionConfig
 from nlqs.nlqs import NLQS, ChromaDBConfig
+import re
 
 load_dotenv()
 
@@ -52,7 +57,7 @@ ALLOWED_EXTENSIONS = {"pdf", "doc", "docx", "txt"}
 
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
-login_manager.login_view = "login"
+login_manager.login_view = "login"  # type: ignore
 
 metadata = MetaData()
 
@@ -182,36 +187,87 @@ def generate_data(text):
     create a json format of the resume with all the key details. resume: {text}"""
 
     prompt = PromptTemplate.from_template(template)
-    llm = ChatOpenAI(api_key=SecretStr(OPENAI_API_KEY), temperature=0.5)
-    json_llm = llm.bind(response_format={"type": "json_object"})
-    llm_chain = prompt | json_llm
-    question = (
-        "create a json format of the resume with all the key details. resume: " + text
+    llm = ChatGoogleGenerativeAI(
+        api_key=SecretStr(OPENAI_API_KEY),
+        model="gemini-2.0-flash-exp",
+        temperature=0.5,
     )
-    final = llm_chain.invoke(input=question)
-    print("--------------------------------------------------")
-    print(final.content)
-    print("--------------------------------------------------")
-    print(type(final.content))
+    llm_chain = prompt | llm | StrOutputParser()
+
+    final = llm_chain.invoke({"text": text})
+    final = re.search(r"```json\n(.*)\n```", final, re.DOTALL)
+    if final:
+        final = final.group(1)
+    else:
+        final = ""
+    print("Raw LLM response:", final)  # Debug print
+
     try:
         # Attempt to parse the summarized input as JSON
-        final_dict = json.loads(str(final.content))
-    except json.JSONDecodeError:
-        # If parsing fails, return an empty OrganizeInput
-        final_dict = {}
+        final_dict = json.loads(str(final))
 
-    # **Create instance of OrganizeInput with parsed data**
-    final_dict = OrganizeInput(
-        name=final_dict.get("name", ""),
-        contact_details=final_dict.get("contact_details", {}),
-        skills=final_dict.get("skills", {}),
-        education=final_dict.get("education", []),
-        experience=final_dict.get("experience", {}),
-        projects=final_dict.get("projects", []),
-        certifications=final_dict.get("certifications", {}),
-        achievements=final_dict.get("achievements", {}),
-    )
-    return final_dict
+        # Convert lists to dictionaries where needed
+        if isinstance(final_dict.get("skills", {}), list):
+            skills_dict = {
+                str(i): skill for i, skill in enumerate(final_dict["skills"])
+            }
+        else:
+            skills_dict = final_dict.get("skills", {})
+
+        if isinstance(final_dict.get("experience", {}), list):
+            experience_dict = {
+                str(i): exp for i, exp in enumerate(final_dict.get("experience", []))
+            }
+        else:
+            experience_dict = final_dict.get("experience", {})
+
+        if isinstance(final_dict.get("certifications", {}), list):
+            cert_dict = {
+                str(i): cert
+                for i, cert in enumerate(final_dict.get("certifications", []))
+            }
+        else:
+            cert_dict = final_dict.get("certifications", {})
+
+        if isinstance(final_dict.get("achievements", {}), list):
+            achieve_dict = {
+                str(i): achieve
+                for i, achieve in enumerate(final_dict.get("achievements", []))
+            }
+        else:
+            achieve_dict = final_dict.get("achievements", {})
+
+        # Create instance of OrganizeInput with properly formatted data
+        organized_data = OrganizeInput(
+            name=final_dict.get("name", ""),
+            contact_details=final_dict.get("contact_details", {}),
+            skills=skills_dict,
+            projects=final_dict.get(
+                "projects", []
+            ),  # Keep as list since defined that way
+            education=final_dict.get(
+                "education", []
+            ),  # Keep as list since defined that way
+            experience=experience_dict,
+            certifications=cert_dict,
+            achievements=achieve_dict,
+        )
+        print("Organized data:", organized_data)  # Debug print
+        return organized_data
+
+    except json.JSONDecodeError as e:
+        print(f"JSON decode error: {e}")  # Debug print
+        # If parsing fails, return an empty OrganizeInput
+        return OrganizeInput(
+            name="",
+            contact_details={},
+            skills={},
+            projects=[],
+            education=[],
+            experience={},
+            certifications={},
+            achievements={},
+        )
 
 
 def save_data(data, file, username):
@@ -328,58 +384,65 @@ def upload():
 @app.route("/uploadFile", methods=["POST"])
 @login_required
 def upload_form():
+    # Combine all selected files and folders
     all_files = request.files.getlist("resumeFiles") + request.files.getlist(
         "resumeFolder"
     )
 
-    if not all_files:
-        flash("No files or folder selected")
+    # Filter out invalid or empty files
+    valid_files = [file for file in all_files if file and file.filename]
+
+    if not valid_files:
+        flash("No valid files or folder selected", "error")
         return redirect(url_for("upload"))
 
     # Create user-specific folder
     user_folder = create_user_folder(current_user.username)
 
-    for file in all_files:
-        if file and file.filename:
-            filename = secure_filename(file.filename)
-            file_path = os.path.join(user_folder, filename)
+    for file in valid_files:
+        if not file.filename:
+            continue
 
-            # File type validation using filetype library
-            kind = filetype.guess(file)
-            if kind is None:
-                flash(f"Invalid file type: {filename}")
-                continue
-            elif kind.mime not in [
-                "application/pdf",
-                "application/msword",
-                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                "text/plain",
-            ]:
-                flash(
-                    f"Unsupported file type: {filename}. Only PDF, DOC, DOCX, and TXT are allowed."
-                )
-                continue
+        filename = secure_filename(file.filename)
+        file_path = os.path.join(user_folder, filename)
 
-            file.save(file_path)
+        # File type validation using filetype library
+        kind = filetype.guess(file)
+        if kind is None:
+            flash(f"Invalid file type: {filename}", "error")
+            continue
+        elif kind.mime not in [
+            "application/pdf",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "text/plain",
+        ]:
+            flash(
+                f"Unsupported file type: {filename}. Only PDF, DOC, DOCX, and TXT are allowed.",
+                "error",
+            )
+            continue
 
-            file_extension = get_file_extension(filename)
-            if file_extension == "pdf":
-                content = pdf_file_loader(file_path)
-            elif file_extension in ["doc", "docx"]:
-                content = doc_file_loader(file_path)
-            else:
-                flash(f"Unsupported file type: {file_extension}")
-                continue
+        # Save file
+        file.save(file_path)
 
-            # Generate structured data from the file content
-            structured_data = generate_data(content)
-
-            # Save structured data to the database and Chroma
-            save_data(structured_data, filename, current_user.username)
-
-            flash(f"File {filename} uploaded and processed successfully!")
+        # Process based on file extension
+        file_extension = get_file_extension(filename)
+        if file_extension == "pdf":
+            content = pdf_file_loader(file_path)
+        elif file_extension in ["doc", "docx"]:
+            content = doc_file_loader(file_path)
         else:
-            flash(f"Unsupported file type: {file.filename}")
+            flash(f"Unsupported file type: {file_extension}", "error")
+            continue
+
+        # Generate structured data from the file content
+        structured_data = generate_data(content)
+
+        # Save structured data to the database and Chroma
+        save_data(structured_data, filename, current_user.username)
+
+        flash(f"File {filename} uploaded and processed successfully!", "success")
 
     return redirect(url_for("upload"))
 
@@ -461,7 +524,7 @@ def signup():
             flash("Username already exists")
             return redirect(url_for("signup"))
 
-        new_user = User(username=username, email=email)
+        new_user = User(username=username, email=email)  # type: ignore
         new_user.set_password(password)
         db.session.add(new_user)
         db.session.commit()
@@ -481,16 +544,13 @@ def login():
         user = User.query.filter_by(username=username).first()
         if user and user.check_password(password):
             login_user(user)
-            flash("Login successful!")
+            # flash("Login successful!")
             return redirect(url_for("index"))
 
         flash("Invalid username or password")
         return redirect(url_for("login"))
 
     return render_template("login.html")
-
-
-from flask import jsonify, request
 
 
 @app.route("/chat", methods=["GET", "POST"])
@@ -531,7 +591,9 @@ def chat():
             nlqs_instance = NLQS(sqlite_config, chroma_config, chroma_client)
             queried_data = nlqs_instance.execute_nlqs_workflow(user_query, messages)
 
-            response = generate_final_response(queried_data, user_query, messages)
+            response = generate_final_response(
+                data=queried_data, query=user_query, chat_history=messages
+            )
             print(f"response: {response}")
 
             # Update conversation history in the database
@@ -565,22 +627,124 @@ def generate_final_response(data, query, chat_history):
 
     llm_history_text = "\n".join(llm_history)
 
-    template = """ You are a perfect Automated Tracking System (named ResumeDB) created by M1N9. Your task is to provide an answer based on the user input and the data retrieved from the database.
-    Provide an answer based on the user input and the data retrieved from the database. 
-    The link for the resumes is "http://localhost:5000/uploads/id(or)filename". Do not add ' before and after the id of the resume.
-    Also, briefly summarize and discuss the data you received before addressing the specific user query.
-    Do not make answers on your own.
+    template = """ResumeDB ATS - Advanced Resume Matching System by M1N9
 
-    User input: {data}\n\ndata : {query}\n\nChat history: {chat_history}
-    Handle Basic Greetings: If the user input is a simple greeting (e.g., "hello", "hi", "hey", "greetings"), respond with a friendly greeting message. Skip the structured analysis and JSON output for these cases.
-    """
+                    CORE FUNCTIONS:
+                    1. Resume Analysis:
+                    - Parse and evaluate candidate resumes
+                    - Extract key skills, experience, and qualifications
+                    - Calculate skill match percentages
+                    - Identify experience alignment
+                    - Flag relevant certifications
+
+                    2. Job Requirement Processing:
+                    - Parse job descriptions (JD)
+                    - Identify required/preferred qualifications
+                    - Extract key technical/soft skills
+                    - Determine experience requirements
+                    - Note specific certifications needed
+
+                    3. Matching Algorithm:
+                    - Calculate overall match scores
+                    - Weight criteria based on JD priorities
+                    - Consider years of experience
+                    - Evaluate skill overlap
+                    - Factor in education requirements
+                    - Account for location preferences
+
+                    SYSTEM CONFIGURATION:
+                    - Resume format: http://localhost:5000/uploads/id(or)filename
+                    - Input structure:
+                    * Original JD: {query}
+                    * Candidate Resumes: {data}
+                    * Interaction Context: {chat_history}
+
+                    RESPONSE PROTOCOL:
+                    1. Analysis Steps:
+                    - Summarize job requirements
+                    - List qualified candidates
+                    - Provide match percentages
+                    - Highlight key alignments/gaps
+                    - Recommend top matches
+
+                    2. Output Format:
+                    - Use Markdown consistently
+                    - Structure data hierarchically
+                    - Include match scores
+                    - Provide evidence-based recommendations
+                    - Link to relevant resumes
+
+                    3. Special Queries:
+                    - Handle basic greetings naturally
+                    - Process skill-specific searches
+                    - Support experience-based filtering
+                    - Enable qualification comparisons
+
+                    ERROR HANDLING:
+                    1. Data Validation:
+                    - Verify resume accessibility
+                    - Check JD completeness
+                    - Validate matching criteria
+                    - Flag missing information
+
+                    2. Query Processing:
+                    - Request clarification when needed
+                    - Handle ambiguous requirements
+                    - Process partial matches
+                    - Manage conflicting criteria
+
+                    MATCHING CRITERIA:
+                    1. Technical Alignment:
+                    - Required skills match
+                    - Technology stack overlap
+                    - Tool/platform experience
+                    - Programming languages
+
+                    2. Experience Fit:
+                    - Years in relevant roles
+                    - Industry experience
+                    - Project scope alignment
+                    - Leadership requirements
+
+                    3. Education/Certification:
+                    - Degree requirements
+                    - Professional certifications
+                    - Continuing education
+                    - Specialized training
+
+                    4. Soft Skills:
+                    - Communication abilities
+                    - Team collaboration
+                    - Project management
+                    - Problem-solving
+
+                    OUTPUT REQUIREMENTS:
+                    1. Standard Response:
+                    - Match percentage
+                    - Key qualifications met
+                    - Notable gaps
+                    - Specific recommendations
+
+                    2. Detailed Analysis:
+                    - Skill-by-skill breakdown
+                    - Experience comparison
+                    - Education alignment
+                    - Certification matches
+
+                    3. Documentation:
+                    - Resume access links
+                    - Match justification
+                    - Alternative candidates
+                    - Improvement suggestions
+                    """
 
     prompt = PromptTemplate.from_template(template)
-    llm = ChatOpenAI(
-        api_key=SecretStr(OPENAI_API_KEY), temperature=0.7, model="gpt-4-turbo"
+    llm = ChatGoogleGenerativeAI(
+        api_key=SecretStr(OPENAI_API_KEY),
+        temperature=0.3,
+        model="gemini-2.0-flash-exp",
     )
-    output_parser = StrOutputParser()
-    chain = prompt | llm | output_parser
+    chain = prompt | llm | StrOutputParser()
     response = chain.invoke(
         {"data": data, "query": query, "chat_history": llm_history_text}
     )
@@ -592,14 +756,14 @@ def generate_final_response(data, query, chat_history):
 @login_required
 def logout():
     logout_user()
-    flash("You have been logged out.")
-    return redirect(url_for("login"))
+    # flash("You have been logged out.")
+    return redirect(url_for("index"))
 
 
 def run():
     with app.app_context():
         db.create_all()
-    # app.run(debug=True)
+    app.run(debug=True)
 
 
 if __name__ == "__main__":

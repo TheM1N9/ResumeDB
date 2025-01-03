@@ -19,7 +19,7 @@
       }
 
       .container {
-        background-color: #fff;
+        background-color: #f2f2f2;
         padding: 30px;
         border-radius: 10px;
         box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
@@ -93,12 +93,21 @@
       }
 
       li {
-        background-color: #4caf50;
-        color: #fff;
         padding: 10px;
         margin: 5px 0;
         border-radius: 5px;
         animation: fadeIn 0.5s;
+      }
+
+      /* Flash message styles */
+      li.error {
+        background-color: #f04e4e; /* Red for error */
+        color: #fff;
+      }
+
+      li.success {
+        background-color: #4caf50; /* Green for success */
+        color: #fff;
       }
 
       .element {
@@ -125,10 +134,11 @@
   <body>
     <div class="container element">
       <h1>Resume Collector</h1>
-      {% with messages = get_flashed_messages() %} {% if messages %}
+      {% with messages = get_flashed_messages(with_categories=true) %} {% if
+      messages %}
       <ul>
-        {% for message in messages %}
-        <li>{{ message }}</li>
+        {% for category, message in messages %}
+        <li class="{{ category }}">{{ message }}</li>
         {% endfor %}
       </ul>
       {% endif %} {% endwith %}

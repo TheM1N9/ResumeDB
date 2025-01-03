@@ -8,7 +8,9 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain.chains import LLMChain
 from langchain.memory import ConversationBufferMemory
 from langchain_core.prompts import PromptTemplate
-from langchain_openai import ChatOpenAI, OpenAI
+
+# from langchain_openai import ChatOpenAI, OpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAI
 
 import chromadb
 
@@ -63,7 +65,7 @@ def summarize(
     column_descriptions_dictionary: Dict[str, str],
     numerical_columns: List[str],
     categorical_columns: List[str],
-    llm: Union[ChatOpenAI, OpenAI],
+    llm: Union[ChatGoogleGenerativeAI, GoogleGenerativeAI],
 ) -> SummarizedInput:
     """Summarizes the user input and returns the summary, quantitative data, and qualitative data, along with the user requested columns in a JSON format.
 
@@ -125,7 +127,7 @@ def summarize(
                 9. Use previous data from the chat history for creating the output.
                 
                 The output JSON should have the following structure:
-                `
+                ```json
                     "summary": "summary of the user input",
                     "quantitative_data":
                                         ` 
@@ -141,7 +143,7 @@ def summarize(
                                         `,
                     "user_requested_columns": "List of columns the user wants data from. If none, leave it as an empty list. Always add product and url to this column.",
                     "user_intent": "The user's intent. If none, leave it as an empty string.",
-                `
+                ```
                 
                 The data we have and chat history:
                 Data:{column_descriptions}\n\n 
@@ -176,9 +178,10 @@ def summarize(
 
     print("------------------------------------------------------------------------")
 
-    # print(f"summarized_input_str: {summarized_input_str.content}")
+    print(f"summarized_input_str: {summarized_input_str}")
 
     try:
+        summarized_input_str = re.sub(r"```json|```", "", summarized_input_str)
         # Attempt to parse the summarized input as JSON
         summarized_input_dict = json.loads(summarized_input_str)
     except json.JSONDecodeError:
@@ -246,7 +249,7 @@ def generate_quantitaive_serach_query(
 
 def qualitative_search(
     collection: chromadb.Collection, data: Dict[str, str], primary_key: str
-) -> List[Any]:
+) -> Optional[List[Any]]:
     """Performs a similarity search on the database and returns all similar results.
 
     Args:
@@ -275,6 +278,36 @@ def qualitative_search(
                 ids.append(item.get(primary_key))
 
         return ids
+
+
+# def qualitative_search(
+#     collection: chromadb.Collection, data: Dict[str, str], primary_key: str, threshold: float = 0.8
+# ) -> List[Any]:
+#     """Performs a similarity search on the database and returns all similar results above a given threshold.
+
+#     Args:
+#         collection (chromadb.Collection): The ChromaDB collection to search.
+#         data (Dict[str, str]): A dictionary of qualitative data to search for.
+#         primary_key (str): The primary key column name in the database.
+#         threshold (float): The minimum similarity score for a result to be included. Defaults to 0.8.
+
+#     Returns:
+#         List[str]: A list of primary keys for matching entries in the database.
+#     """
+#     ids = []
+#     for column, condition in data.items():
+#         query_result = collection.query(
+#             query_texts=condition,
+#             n_results=10,  # Get a reasonable number of results to filter from
+#             where={"column_name": column}
+#         )
+
+#         for distances, metadatas in zip(query_result['distances'], query_result['metadatas']):
+#             for distance, metadata in zip(distances, metadatas):
+#                 if distance >= threshold:
+#                     ids.append(metadata.get(primary_key))
+
+#     return ids
 
 
 # def qualitaive_search(collection: chromadb.Collection, data: Dict[str, str], primary_key: str) -> List[str]:
@@ -319,9 +352,7 @@ def similarity_search(collection: chromadb.Collection, user_input: str) -> str:
         str: the first similar result.
 
     """
-    result = collection.query(
-        query_texts=user_input, n_results=1, include=["documents", "metadatas"]
-    )
+    result = collection.query(query_texts=user_input, n_results=1)
     if result:
         result_str = str(result)
         result_str = result_str.replace("{", "")
@@ -341,7 +372,7 @@ def generate_query(
     column_descriptions: Dict[str, str],
     numerical_columns: List[str],
     categorical_columns: List[str],
-    llm: Union[ChatOpenAI, OpenAI],
+    llm: Union[ChatGoogleGenerativeAI, GoogleGenerativeAI],
     dataset_table_name: str,
 ) -> str:
     """Generates an SQL query based on the user input and chat history.

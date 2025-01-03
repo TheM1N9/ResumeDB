@@ -3,7 +3,7 @@ import chromadb
 from langchain.chains import LLMChain
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
-from pydantic.v1 import SecretStr
+from pydantic import SecretStr
 from langchain_core.output_parsers import StrOutputParser
 from nlqs.parameters import OPENAI_API_KEY
 from nlqs.database.sqlite import SQLiteDriver

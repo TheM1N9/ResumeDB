@@ -3,6 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="ResumeDB - Your ultimate solution for smart, efficient, and accurate resume management."
+    />
+    <meta property="og:title" content="ResumeDB - Welcome" />
+    <meta
+      property="og:description"
+      content="Your ultimate solution for smart, efficient, and accurate resume management."
+    />
+    <meta property="og:image" content="resumedb.jpg" />
+    <meta property="og:url" content="your_page_url" />
     <title>ResumeDB - Welcome</title>
     <link rel="stylesheet" href="styles.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -44,6 +55,8 @@
 
       nav ul {
         list-style: none;
+        display: flex;
+        gap: 1rem;
       }
 
       nav ul li {
@@ -77,6 +90,8 @@
         background: linear-gradient(to right, #007bff, #00c6ff);
         color: #fff;
         min-height: 80vh;
+        flex-wrap: wrap;
+        text-align: center;
       }
 
       .content {
@@ -96,6 +111,8 @@
       .buttons {
         display: flex;
         gap: 1rem;
+        flex-wrap: wrap;
+        justify-content: center;
       }
 
       .buttons .btn {
@@ -122,6 +139,18 @@
         transform: scale(1.05);
       }
 
+      .logout-btn {
+        background-color: #dc3545;
+        color: #fff;
+        /* padding: 1rem 2rem; */
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        text-decoration: none;
+        font-size: 1rem;
+        transition: transform 0.2s ease;
+      }
+
       .image-container {
         max-width: 40%;
       }
@@ -142,6 +171,22 @@
         color: #6c757d;
         font-size: 0.9rem;
       }
+
+      @media (max-width: 768px) {
+        .welcome-section {
+          flex-direction: column;
+          text-align: center;
+        }
+
+        .image-container img {
+          height: auto;
+          width: 80%;
+        }
+
+        .content {
+          max-width: 100%;
+        }
+      }
     </style>
   </head>
 
@@ -150,39 +195,44 @@
       <nav>
         <div class="logo">ResumeDB</div>
         <ul>
-          <!-- <a href="{{ url_for('signup') }}">Signup</a> -->
-          <!-- <a href="{{ url_for('login') }}">Login</a> -->
+          {% if not current_user.is_authenticated %}
           <li>
             <a href="{{ url_for('login') }}" class="btn login-btn">Login</a>
           </li>
           <li>
-            <a href="{{ url_for('signup')}}" class="btn login-btn">Signup</a>
+            <a href="{{ url_for('signup') }}" class="btn login-btn">Signup</a>
           </li>
+          {% else %}
+          <li>
+            <a href="{{ url_for('logout') }}" class="btn logout-btn">Logout</a>
+          </li>
+          {% endif %}
         </ul>
       </nav>
     </header>
 
-    <section class="welcome-section">
-      <div class="content">
-        <h1>Welcome to ResumeDB</h1>
-        <p>
-          Your ultimate solution for smart, efficient, and accurate resume
-          management.
-        </p>
-        <div class="buttons">
-          <a href="/upload" class="btn primary-btn">Upload Resume</a>
-          <a href="/chat" class="btn secondary-btn">Start Chat</a>
+    <main>
+      <section class="welcome-section">
+        <div class="content">
+          <h1>Welcome to ResumeDB</h1>
+          <p>
+            Your ultimate solution for smart, efficient, and accurate resume
+            management.
+          </p>
+          <div class="buttons">
+            <a href="/upload" class="btn primary-btn">Upload Resume</a>
+            <a href="/resumes" class="btn secondary-btn">View Resumes</a>
+            <a href="/chat" class="btn primary-btn">Start Chat</a>
+          </div>
         </div>
-      </div>
-      <div class="image-container">
-        <img
-          src="static/images/resume_Picture.png"
-          alt="Resume Management Illustration"
-        />
-      </div>
-    </section>
-
-    <button><a href="{{ url_for('logout') }}">logout</a></button>
+        <div class="image-container">
+          <img
+            src="static/images/resume_Picture.png"
+            alt="Resume Management Illustration"
+          />
+        </div>
+      </section>
+    </main>
 
     <footer>
       <p>© 2024 ResumeDB. All rights reserved.</p>

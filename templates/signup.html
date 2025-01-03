@@ -4,23 +4,133 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Signup</title>
+    <style>
+      body {
+        /* background-image: url("https://user-images.githubusercontent.com/103044819/220179083-16f84162-1507-4d73-935b-848c267648c6.jpg"); */
+        background-size: cover;
+        background-repeat: no-repeat;
+        background-position: center center;
+        margin: 0;
+        font-family: Arial, sans-serif;
+        background-color: #f7f7f7;
+      }
+
+      .container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+      }
+
+      h1 {
+        color: #2c3e50;
+        font-size: 2.5em;
+        margin-bottom: 20px;
+      }
+
+      form {
+        background-color: #fff;
+        padding: 30px; /* Increased padding for smaller screens */
+        border-radius: 5px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        width: 300px;
+        text-align: center;
+      }
+
+      input[type="email"],
+      input[type="text"],
+      input[type="password"] {
+        width: 100%;
+        padding: 14px 20px; /* Increased padding for smaller screens */
+        margin: 8px 0;
+        box-sizing: border-box;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+      }
+
+      button[type="submit"] {
+        background-color: #3498db;
+        color: #fff;
+        border: none;
+        padding: 15px 30px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 1em;
+        transition: background-color 0.3s ease;
+        margin-top: 20px;
+      }
+
+      button[type="submit"]:hover {
+        background-color: #2980b9;
+      }
+
+      /* Media Queries for responsiveness */
+      @media only screen and (max-width: 768px) {
+        form {
+          width: 80%;
+        }
+
+        input[type="email"],
+        input[type="text"],
+        input[type="password"] {
+          padding: 12px 18px; /* Adjusted padding for smaller screens */
+        }
+
+        button {
+          padding: 14px 18px; /* Adjusted padding for smaller screens */
+        }
+      }
+
+      @media only screen and (max-width: 480px) {
+        form {
+          width: 90%;
+        }
+      }
+      .flash-message {
+        background-color: #f0ad4e; /* Example: Yellow background for warning */
+        color: #fff;
+        padding: 10px;
+        border-radius: 5px;
+        margin-bottom: 10px;
+      }
+    </style>
   </head>
   <body>
-    <h2>Signup</h2>
-    <form method="POST" action="{{ url_for('signup') }}">
-      <label for="username">Username:</label><br />
-      <input type="text" id="username" name="username" required /><br />
-      <label for="email">Email:</label><br />
-      <input type="email" id="email" name="email" required /><br />
-      <label for="password">Password:</label><br />
-      <input
-        type="password"
-        id="password"
-        name="password"
-        required
-      /><br /><br />
-      <button type="submit">Signup</button>
-    </form>
-    <p>Already have an account? <a href="{{ url_for('login') }}">Login</a></p>
+    <div class="container">
+      <form method="POST" action="{{ url_for('signup') }}">
+        <h1>Signup</h1>
+        {% with messages = get_flashed_messages() %} {% if messages %}
+        <div class="flash-message">
+          {% for message in messages %} {{ message }} {% endfor %}
+        </div>
+        {% endif %} {% endwith %}
+        <input
+          type="text"
+          id="username"
+          name="username"
+          placeholder="Enter your Username"
+          required
+        />
+        <input
+          type="email"
+          id="email"
+          name="email"
+          placeholder="Enter your Email"
+          required
+        />
+        <input
+          type="password"
+          id="password"
+          name="password"
+          placeholder="Enter your Password"
+          required
+        />
+        <button type="submit">Signup</button>
+        <br />
+        <p>
+          Already have an account? <a href="{{ url_for('login') }}">Login</a>
+        </p>
+      </form>
+    </div>
   </body>
 </html>

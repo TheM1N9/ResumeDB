@@ -14,8 +14,10 @@ from nlqs.query import (
 )
 from dataclasses import dataclass
 from pathlib import Path
-from langchain_openai import ChatOpenAI
-from pydantic.v1 import SecretStr
+
+# from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
+from pydantic import SecretStr
 from nlqs.parameters import OPENAI_API_KEY
 from nlqs.parameters import LOGGER_FILE
 
@@ -64,9 +66,9 @@ class NLQS:
 
         # Create the llm object
         # Initializes the ChatOpenAI LLM model
-        self.llm = ChatOpenAI(
+        self.llm = ChatGoogleGenerativeAI(
             temperature=0,
-            model="gpt-4-turbo",
+            model="gemini-2.0-flash-exp",
             api_key=SecretStr(OPENAI_API_KEY),
             max_tokens=1000,
         )
@@ -149,6 +151,8 @@ class NLQS:
             primary_key=primary_key,
         )
 
+        print(f"user_input: {user_input}")
+
         # Step 5
         if not user_input.strip():
             response = ""
@@ -188,6 +192,8 @@ class NLQS:
         logger.info(f"user input: {user_input}")
         logger.info(f"Summarized input: {summarized_input}")
 
+        print(f"user requested columns: {summarized_input.user_requested_columns}")
+
         if intent == "sql_injection":
             response = ""
 
@@ -225,11 +231,13 @@ class NLQS:
 
                 print(intersection_ids)
 
-                final_query = f"""select * from {driver.db_config.dataset_table_name} where {primary_key} in ({','.join(f'"{id}"' for id in intersection_ids)})"""
+                if intersection_ids:
+                    final_query = f"""select * from {driver.db_config.dataset_table_name} where {primary_key} in ({','.join(f'"{id}"' for id in intersection_ids)})"""
+                    response = str(driver.execute_query(final_query))
+                else:
+                    response = "No matching results found."
 
                 # columns_database = driver.database_columns()
-
-                response = str(driver.execute_query(final_query))
 
                 # response = f"{columns_database}\n\n{data_retreived}"
 
