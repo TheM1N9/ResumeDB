@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% block title %}ResumeDB{% endblock %}</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --primary-color: #2563eb;
+        --secondary-color: #1e40af;
+        --success-color: #16a34a;
+        --error-color: #dc2626;
+        --background-color: #f8fafc;
+        --text-color: #1e293b;
+        --border-color: #e2e8f0;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Poppins", sans-serif;
+        background-color: var(--background-color);
+        color: var(--text-color);
+        line-height: 1.6;
+      }
+
+      .navbar {
+        background-color: white;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        padding: 1rem 5%;
+        position: fixed;
+        width: 100%;
+        top: 0;
+        z-index: 1000;
+      }
+
+      .nav-content {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+
+      .logo {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: var(--primary-color);
+        text-decoration: none;
+      }
+
+      .nav-links {
+        display: flex;
+        gap: 2rem;
+        align-items: center;
+      }
+
+      .nav-link {
+        color: var(--text-color);
+        text-decoration: none;
+        font-weight: 500;
+        transition: color 0.2s;
+      }
+
+      .nav-link:hover {
+        color: var(--primary-color);
+      }
+
+      .btn {
+        padding: 0.5rem 1.5rem;
+        border-radius: 0.5rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-decoration: none;
+        display: inline-block;
+      }
+
+      .btn-primary {
+        background-color: var(--primary-color);
+        color: white;
+        border: none;
+      }
+
+      .btn-primary:hover {
+        background-color: var(--secondary-color);
+      }
+
+      .btn-outline {
+        border: 2px solid var(--primary-color);
+        color: var(--primary-color);
+        background: transparent;
+      }
+
+      .btn-outline:hover {
+        background-color: var(--primary-color);
+        color: white;
+      }
+
+      .default-container {
+        max-width: 1200px;
+        margin: 6rem auto 2rem;
+        padding: 0 1rem;
+      }
+
+      .index-container {
+        margin-top: 0;
+        padding: 0;
+        max-width: none;
+      }
+
+      .flash-message {
+        padding: 1rem;
+        border-radius: 0.5rem;
+        margin-bottom: 1rem;
+        animation: slideIn 0.3s ease-out;
+      }
+
+      .flash-success {
+        background-color: #dcfce7;
+        color: var(--success-color);
+        border: 1px solid #86efac;
+      }
+
+      .flash-error {
+        background-color: #fee2e2;
+        color: var(--error-color);
+        border: 1px solid #fca5a5;
+      }
+
+      @keyframes slideIn {
+        from {
+          transform: translateY(-1rem);
+          opacity: 0;
+        }
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+
+      @media (max-width: 768px) {
+        .nav-links {
+          gap: 1rem;
+        }
+
+        .btn {
+          padding: 0.4rem 1rem;
+        }
+      }
+    </style>
+    {% block extra_css %}{% endblock %}
+  </head>
+  <body>
+    <nav class="navbar">
+      <div class="nav-content">
+        <a href="/" class="logo">ResumeDB</a>
+        <div class="nav-links">
+          {% if current_user.is_authenticated %}
+          <a href="/upload" class="nav-link">Upload</a>
+          <a href="/resumes" class="nav-link">Resumes</a>
+          <a href="/chat" class="nav-link">Chat</a>
+          <a href="/logout" class="btn btn-outline">Logout</a>
+          {% else %}
+          <a href="/login" class="btn btn-primary">Login</a>
+          <a href="/signup" class="btn btn-outline">Sign Up</a>
+          {% endif %}
+        </div>
+      </div>
+    </nav>
+
+    <div
+      class="{% if request.endpoint == 'index' %}index-container{% else %}default-container{% endif %}"
+    >
+      {% with messages = get_flashed_messages(with_categories=true) %} {% if
+      messages %} {% for category, message in messages %}
+      <div class="flash-message flash-{{ category }}">{{ message }}</div>
+      {% endfor %} {% endif %} {% endwith %} {% block content %}{% endblock %}
+    </div>
+  </body>
+</html>

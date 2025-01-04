@@ -43,6 +43,16 @@ import filetype
 from nlqs.database.sqlite import SQLiteConnectionConfig
 from nlqs.nlqs import NLQS, ChromaDBConfig
 import re
+from sqlalchemy import (
+    create_engine,
+    text,
+    MetaData,
+    Table,
+    Column,
+    Integer,
+    String,
+    DateTime,
+)
 
 load_dotenv()
 
@@ -65,6 +75,22 @@ UPLOAD_FOLDER = "uploads"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
+
+# Add this after your other database configurations
+engine = create_engine("sqlite:///instance/resumes.db")
+
+
+@app.template_filter("from_json")
+def from_json(value):
+    try:
+        if isinstance(value, str):
+            return json.loads(value)
+        elif value is None:
+            return {}
+        return value
+    except (ValueError, TypeError) as e:
+        print(f"JSON parsing error: {e}")
+        return {}
 
 
 # Function to create user-specific folder
@@ -89,6 +115,9 @@ def create_user_table(username):
         db.Column("experience", db.JSON, nullable=True),
         db.Column("certifications", db.JSON, nullable=True),
         db.Column("achievements", db.JSON, nullable=True),
+        db.Column(
+            "role_recommendation", db.JSON, nullable=True
+        ),  # Update field name here
         extend_existing=True,
     )
 
@@ -127,6 +156,12 @@ class ConversationHistory(db.Model):
     bot_response = db.Column(db.Text, nullable=False)
 
     user = db.relationship("User", backref=db.backref("conversations", lazy=True))
+
+    def __init__(self, user_id, timestamp, user_message, bot_response):
+        self.user_id = user_id
+        self.timestamp = timestamp
+        self.user_message = user_message
+        self.bot_response = bot_response
 
 
 class Resume(db.Model):
@@ -179,12 +214,83 @@ class OrganizeInput:
     experience: Dict[str, str]
     certifications: Dict[str, str]
     achievements: Dict[str, str]
+    role_recommendation: Dict[str, Dict[str, str]]
 
 
 def generate_data(text):
-    template = """you will be given a resume of a person. 
-    Please summarize it and identify 'name', 'contact_details', 'skills', 'education', 'experience', 'projects', 'certifications', 'achievements'.
-    create a json format of the resume with all the key details. resume: {text}"""
+    template = """You are a senior HR consultant and talent acquisition specialist. Analyze this resume and provide:
+
+                1. Extract and structure these key components:
+                - Personal Information:
+                    * Full name
+                    * Contact details (email, phone, location, LinkedIn)
+                    * Professional summary
+
+                - Professional Details:
+                    * Technical and soft skills 
+                    * Work experience (company, title, dates, key achievements)
+                    * Education (degrees, institutions, dates)
+                    * Notable projects
+                    * Certifications
+                    * Achievements
+                    * Languages (if relevant)
+
+                2. Career Role Analysis:
+                - Identify 1-2 PRIMARY job roles that best match their profile based on:
+                    * Core technical skills and expertise level
+                    * Years and type of experience
+                    * Educational background
+                    * Industry exposure
+                
+                - For each recommended role, specify:
+                    * Exact job title (use standard industry titles)
+                    * Seniority level
+                    * Key qualifications they meet
+                    * Any critical skill gaps
+                    * Typical industry segments
+
+                3. Evaluation criteria:
+                - Roles must match their experience level exactly
+                - At least 80% of their core skills should align with the role
+                - Focus on their strongest demonstrated competencies
+                - Consider both technical expertise and practical experience
+
+                Output Format as JSON:
+                ```json
+                {{
+                    "name": "string",
+                    "contact_details": {{
+                                "email": "string",
+                                "phone": "string",
+                                "location": "string",
+                                "linkedin": "string",
+                                "portfolio": "string"
+                    }},
+                    "skills": {{"technical_skills": [list of skills], "soft_skills": [list of skills]}},
+                    "experience": [{{
+                                "company": "string",
+                                "title": "string",
+                                "dates": "string",
+                                "key_achievements": [list of achievements at the company]
+                            }}],
+                    "education": [{{
+                                "degree": "string",
+                                "institution": "string",
+                                "dates": "string",
+                                "cgpa": "string"
+                                }}],
+                    "projects": [{{"name": "string", "description": "string", "technologies": [list of technologies] }}],
+                    "certifications": [{{"name": "string", "institution": "string" }}],
+                    "achievements": [list of achievements],
+                    "role_recommendation": {{
+                                                "role_1": {{"job_title": "string", "seniority_level": "string", "key_qualifications": [list of skills], "skill_gaps": [list of skill gaps]}}, 
+                                                "role_2": {{"job_title": "string", "seniority_level": "string", "key_qualifications": [list of skills], "skill_gaps": [list of skill gaps]}}
+                                        }}
+                }}
+                ```
+                You must not include any other information in the JSON output. You can skip any fields that are not present in the resume.
+
+                Resume text: {text}"""
 
     prompt = PromptTemplate.from_template(template)
     llm = ChatGoogleGenerativeAI(
@@ -200,10 +306,10 @@ def generate_data(text):
         final = final.group(1)
     else:
         final = ""
-    print("Raw LLM response:", final)  # Debug print
+
+    print(f"Candidate data: {final}")
 
     try:
-        # Attempt to parse the summarized input as JSON
         final_dict = json.loads(str(final))
 
         # Convert lists to dictionaries where needed
@@ -237,27 +343,28 @@ def generate_data(text):
         else:
             achieve_dict = final_dict.get("achievements", {})
 
+        if isinstance(final_dict.get("role_recommendation", {}), dict):
+            role_recommendation = final_dict.get("role_recommendation", {})
+        else:
+            role_recommendation = final_dict.get("role_recommendation", {})
+
         # Create instance of OrganizeInput with properly formatted data
         organized_data = OrganizeInput(
             name=final_dict.get("name", ""),
             contact_details=final_dict.get("contact_details", {}),
             skills=skills_dict,
-            projects=final_dict.get(
-                "projects", []
-            ),  # Keep as list since defined that way
-            education=final_dict.get(
-                "education", []
-            ),  # Keep as list since defined that way
+            projects=final_dict.get("projects", []),
+            education=final_dict.get("education", []),
             experience=experience_dict,
             certifications=cert_dict,
             achievements=achieve_dict,
+            role_recommendation=role_recommendation,
         )
-        print("Organized data:", organized_data)  # Debug print
+
         return organized_data
 
     except json.JSONDecodeError as e:
-        print(f"JSON decode error: {e}")  # Debug print
-        # If parsing fails, return an empty OrganizeInput
+        print(f"JSON decode error: {e}")
         return OrganizeInput(
             name="",
             contact_details={},
@@ -267,61 +374,74 @@ def generate_data(text):
             experience={},
             certifications={},
             achievements={},
+            role_recommendation={},
         )
 
 
 def save_data(data, file, username):
     """Refactored function to save data to both database and Chroma"""
-    # Serialize data to JSON
-    contact_details = json.dumps(data.contact_details)
-    skills = json.dumps(data.skills)
-    education = json.dumps(data.education)
-    experience = json.dumps(data.experience)
-    projects = json.dumps(data.projects)
-    certifications = json.dumps(data.certifications)
-    achievements = json.dumps(data.achievements)
+    try:
+        # Serialize data to JSON with error handling
+        def safe_json_dumps(obj):
+            if obj is None or obj == "" or isinstance(obj, type(None)):
+                return json.dumps({})
+            try:
+                # Convert to dict first if it's a special object
+                if hasattr(obj, "__dict__"):
+                    obj = obj.__dict__
+                return json.dumps(obj)
+            except (TypeError, json.JSONDecodeError) as e:
+                print(f"Error serializing object: {obj}, Error: {e}")
+                return json.dumps({})
 
-    # Dynamically create table
-    resume_table = create_user_table(username)
-    metadata.create_all(db.engine)
+        # Serialize data to JSON with null checks
+        contact_details = safe_json_dumps(getattr(data, "contact_details", {}))
+        skills = safe_json_dumps(getattr(data, "skills", {}))
+        education = safe_json_dumps(getattr(data, "education", []))
+        experience = safe_json_dumps(getattr(data, "experience", {}))
+        projects = safe_json_dumps(getattr(data, "projects", []))
+        certifications = safe_json_dumps(getattr(data, "certifications", {}))
+        achievements = safe_json_dumps(getattr(data, "achievements", {}))
+        role_recommendation = safe_json_dumps(getattr(data, "role_recommendation", {}))
 
-    # Check if a resume with the given filename already exists
-    existing_resume = db.session.query(resume_table).filter_by(id=file).first()
+        print(f"Debug - Role recommendation before save: {role_recommendation}")
 
-    if existing_resume:
-        # Update existing resume
-        db.session.query(resume_table).filter_by(id=file).update(
-            {
-                "name": data.name,
-                "contact_details": contact_details,
-                "skills": skills,
-                "education": education,
-                "experience": experience,
-                "projects": projects,
-                "certifications": certifications,
-                "achievements": achievements,
-            }
-        )
-    else:
-        # Insert a new resume
-        insert_stmt = resume_table.insert().values(
-            id=file,
-            name=data.name,
-            contact_details=contact_details,
-            skills=skills,
-            education=education,
-            experience=experience,
-            projects=projects,
-            certifications=certifications,
-            achievements=achievements,
-        )
-        db.session.execute(insert_stmt)
+        # Dynamically create table
+        resume_table = create_user_table(username)
+        metadata.create_all(db.engine)
 
-    print(f"Saved to database: {file}")
-    db.session.commit()
+        resume_data = {
+            "name": data.name,
+            "contact_details": contact_details,
+            "skills": skills,
+            "education": education,
+            "experience": experience,
+            "projects": projects,
+            "certifications": certifications,
+            "achievements": achievements,
+            "role_recommendation": role_recommendation,
+        }
 
-    # Save to Chroma
-    save_to_chroma(data, file, username)
+        if db.session.query(resume_table).filter_by(id=file).first():
+            # Update existing resume using update()
+            db.session.query(resume_table).filter_by(id=file).update(resume_data)
+        else:
+            # Insert a new resume
+            insert_stmt = resume_table.insert().values(id=file, **resume_data)
+            db.session.execute(insert_stmt)
+
+        db.session.commit()
+        print(f"Saved to database: {file}")
+        print(f"Role recommendation data being saved: {role_recommendation}")
+
+        # Save to Chroma
+        save_to_chroma(data, file, username)
+
+    except Exception as e:
+        print(f"Error in save_data: {str(e)}")
+        print(f"Error type: {type(e)}")
+        db.session.rollback()
+        raise
 
 
 def save_to_chroma(data, file, username):
@@ -337,6 +457,7 @@ def save_to_chroma(data, file, username):
             "experience": data.experience,
             "certifications": data.certifications,
             "achievements": data.achievements,
+            "role_recommendation": data.role_recommendation,
         }
 
         if data is None:
@@ -436,6 +557,11 @@ def upload_form():
             flash(f"Unsupported file type: {file_extension}", "error")
             continue
 
+        # print(f"type of content: {type(content)}")
+
+        # print(f"extracted content: {content}")
+        # print(content)
+
         # Generate structured data from the file content
         structured_data = generate_data(content)
 
@@ -450,36 +576,212 @@ def upload_form():
 @app.route("/resumes")
 @login_required
 def list_resumes():
-    page = request.args.get("page", 1, type=int)
-    per_page = 10
+    try:
+        print("Starting list_resumes function...")
 
-    # Use a raw SQL query to select from the user's specific table
-    with db.engine.connect() as conn:
-        result = conn.execute(
-            text(
-                f"SELECT * FROM {current_user.username} LIMIT {per_page} OFFSET {(page-1)*per_page}"
+        # Create user table if it doesn't exist
+        user_table = create_user_table(current_user.username)
+        metadata.create_all(db.engine)
+
+        page = request.args.get("page", 1, type=int)
+        role_filter = request.args.get("role", None)
+        per_page = 10
+        offset = (page - 1) * per_page
+
+        with engine.connect() as conn:
+            print("Connected to database...")
+
+            # Debug: Print table structure
+            table_info = conn.execute(
+                text(f"PRAGMA table_info({current_user.username})")
+            ).fetchall()
+            print(f"Table structure for {current_user.username}:", table_info)
+
+            # Modified roles query to handle nested JSON structure
+            roles_query = text(
+                f"""
+                WITH RECURSIVE json_tree(role) AS (
+                    SELECT json_extract(role_recommendation, '$') as role
+                    FROM {current_user.username}
+                ),
+                extracted_roles(title) AS (
+                    SELECT DISTINCT json_extract(value, '$.job_title')
+                    FROM json_tree,
+                    json_each(role)
+                    WHERE json_extract(value, '$.job_title') IS NOT NULL
+                )
+                SELECT title FROM extracted_roles WHERE title IS NOT NULL
+                """
             )
-        )
-        resumes = [dict(row._mapping) for row in result]
+            available_roles = [row[0] for row in conn.execute(roles_query).fetchall()]
+            print("Available roles:", available_roles)
 
-    # Get the total count of resumes for pagination
-    with db.engine.connect() as conn:
-        count_result = conn.execute(
-            text(f"SELECT COUNT(*) FROM {current_user.username}")
-        )
-        total_count = count_result.scalar()
+            # Modified base query to properly handle JSON string parsing
+            base_query = f"SELECT * FROM {current_user.username}"
+            if role_filter:
+                base_query += """
+                    WHERE (
+                        SELECT COUNT(*)
+                        FROM json_each(json_extract(role_recommendation, '$'))
+                        WHERE LOWER(json_extract(value, '$.job_title')) LIKE LOWER(:role)
+                        OR LOWER(json_extract(value, '$.job_title')) LIKE LOWER(:partial_role)
+                    ) > 0
+                """
+                params = {
+                    "role": f"%{role_filter}%",
+                    "partial_role": f"%{' '.join(role_filter.split())}%",
+                    "limit": per_page,
+                    "offset": offset,
+                }
+            else:
+                params = {"limit": per_page, "offset": offset}
 
-    if not resumes or not total_count:
-        flash("No resumes found.")
-        return redirect(url_for("upload"))
+            base_query += " LIMIT :limit OFFSET :offset"
+            print("Executing query:", base_query)
+            print("With parameters:", params)
 
-    return render_template(
-        "resumes.html",
-        resumes=resumes,
-        page=page,
-        per_page=per_page,
-        total_pages=(total_count // per_page) + (total_count % per_page > 0),
-    )
+            # Execute query
+            result = conn.execute(text(base_query), params)
+            resumes = result.fetchall()
+            print(f"Found {len(resumes)} resumes")
+
+            # Process results
+            resumes_data = []
+            for idx, row in enumerate(resumes):
+                print(f"\nProcessing resume {idx + 1}:")
+                resume_dict = dict(row._mapping)
+                print("Initial resume data keys:", resume_dict.keys())
+
+                print(
+                    f"Type of role recommendation: {type(resume_dict['role_recommendation'])}"
+                )
+
+                # Parse all JSON fields
+                json_fields = [
+                    "contact_details",
+                    "skills",
+                    "education",
+                    "experience",
+                    "projects",
+                    "certifications",
+                    "achievements",
+                    "role_recommendation",
+                ]
+
+                for field in json_fields:
+                    print(f"\nProcessing field: {field}")
+                    if field in resume_dict:
+                        print(f"Raw {field} value:", resume_dict[field])
+                        print(f"{field} type:", type(resume_dict[field]))
+
+                        try:
+                            if resume_dict[field] is None:
+                                print(f"Setting {field} to default empty value")
+                                resume_dict[field] = (
+                                    []
+                                    if field
+                                    in ["projects", "education", "achievements"]
+                                    else {}
+                                )
+                            elif isinstance(resume_dict[field], str):
+                                print(f"Parsing {field} as JSON string")
+                                parsed_value = json.loads(resume_dict[field])
+                                print(
+                                    f"Type after initial parsing: {type(parsed_value)}"
+                                )
+
+                                # Convert string JSON to Python objects
+                                if isinstance(parsed_value, str):
+                                    parsed_value = json.loads(parsed_value)
+
+                                # Handle specific field types
+                                if field == "projects":
+                                    resume_dict[field] = (
+                                        parsed_value
+                                        if isinstance(parsed_value, list)
+                                        else []
+                                    )
+                                elif field == "achievements":
+                                    resume_dict[field] = (
+                                        parsed_value
+                                        if isinstance(parsed_value, list)
+                                        else []
+                                    )
+                                elif field == "education":
+                                    resume_dict[field] = (
+                                        parsed_value
+                                        if isinstance(parsed_value, list)
+                                        else []
+                                    )
+                                else:
+                                    resume_dict[field] = (
+                                        parsed_value
+                                        if isinstance(parsed_value, dict)
+                                        else {}
+                                    )
+
+                                print(f"Final parsed type: {type(resume_dict[field])}")
+
+                            print(f"Final {field} value:", resume_dict[field])
+                            print(f"Final {field} type: {type(resume_dict[field])}")
+
+                        except json.JSONDecodeError as e:
+                            print(f"Error parsing {field}: {e}")
+                            resume_dict[field] = (
+                                []
+                                if field in ["projects", "education", "achievements"]
+                                else {}
+                            )
+                        except Exception as e:
+                            print(f"Unexpected error processing {field}: {e}")
+                            resume_dict[field] = (
+                                []
+                                if field in ["projects", "education", "achievements"]
+                                else {}
+                            )
+
+                        print(f"Final {field} value:", resume_dict[field])
+
+                print("\nFinal resume dict keys:", resume_dict.keys())
+                resumes_data.append(resume_dict)
+
+            print("\nTotal processed resumes:", len(resumes_data))
+
+            # Add these lines before the template rendering
+            count = len(resumes_data)
+            total_pages = (count + per_page - 1) // per_page
+
+            if not resumes_data:
+                return render_template(
+                    "resumes.html",
+                    resumes=[],
+                    page=page,
+                    per_page=per_page,
+                    total=0,
+                    total_pages=0,
+                    available_roles=available_roles,
+                    current_role=role_filter,
+                )
+
+            return render_template(
+                "resumes.html",
+                resumes=resumes_data,
+                page=page,
+                per_page=per_page,
+                total=count,
+                total_pages=total_pages,
+                available_roles=available_roles,
+                current_role=role_filter,
+            )
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        print(f"Error type: {type(e)}")
+        import traceback
+
+        print("Full traceback:")
+        print(traceback.format_exc())
+        flash("Error loading resumes", "error")
+        return redirect(url_for("index"))
 
 
 @app.route("/uploads/<filename>")
@@ -558,7 +860,8 @@ def login():
 def chat():
     # Get the user's conversation history from the database
     messages_db = (
-        ConversationHistory.query.filter_by(user_id=current_user.id)
+        db.session.query(ConversationHistory)
+        .filter_by(user_id=current_user.id)
         .order_by(ConversationHistory.timestamp)
         .all()
     )
@@ -626,117 +929,45 @@ def generate_final_response(data, query, chat_history):
     ]
 
     llm_history_text = "\n".join(llm_history)
+    template = """
+    ResumeDB Assistant - An AI-powered Resume Analysis System by M1N9
 
-    template = """ResumeDB ATS - Advanced Resume Matching System by M1N9
 
-                    CORE FUNCTIONS:
-                    1. Resume Analysis:
-                    - Parse and evaluate candidate resumes
-                    - Extract key skills, experience, and qualifications
-                    - Calculate skill match percentages
-                    - Identify experience alignment
-                    - Flag relevant certifications
+    OPERATING GUIDELINES:
+    1. Data Processing:
+    - Analyze incoming data before addressing queries
+    - Provide concise data summaries when relevant
+    - Never fabricate responses - use only provided data
 
-                    2. Job Requirement Processing:
-                    - Parse job descriptions (JD)
-                    - Identify required/preferred qualifications
-                    - Extract key technical/soft skills
-                    - Determine experience requirements
-                    - Note specific certifications needed
+    2. Query Handling:
+    - Process user input: {query}
+    - Reference database: {data}
+    - Consider context: {chat_history}
 
-                    3. Matching Algorithm:
-                    - Calculate overall match scores
-                    - Weight criteria based on JD priorities
-                    - Consider years of experience
-                    - Evaluate skill overlap
-                    - Factor in education requirements
-                    - Account for location preferences
+    3. Response Protocol:
+    - Format all outputs in Markdown
+    - Include relevant resume URLs when referencing specific documents
+    - Structure responses for clarity and readability
 
-                    SYSTEM CONFIGURATION:
-                    - Resume format: http://localhost:5000/uploads/id(or)filename
-                    - Input structure:
-                    * Original JD: {query}
-                    * Candidate Resumes: {data}
-                    * Interaction Context: {chat_history}
+    4. Special Cases:
+    - Respond to the user's query in a professional manner.
+    - Basic greetings ("hello", "hi", "hey", "greetings"):
+        * Respond with contextual greeting
+        * Skip detailed analysis
+        * Maintain professional tone
 
-                    RESPONSE PROTOCOL:
-                    1. Analysis Steps:
-                    - Summarize job requirements
-                    - List qualified candidates
-                    - Provide match percentages
-                    - Highlight key alignments/gaps
-                    - Recommend top matches
+    5. Error Handling:
+    - Clearly indicate when data is missing or incomplete
+    - Request clarification when queries are ambiguous
+    - Provide guidance for malformed queries
 
-                    2. Output Format:
-                    - Use Markdown consistently
-                    - Structure data hierarchically
-                    - Include match scores
-                    - Provide evidence-based recommendations
-                    - Link to relevant resumes
+    The link for the resumes is "http://localhost:5000/uploads/id(or)filename". 
 
-                    3. Special Queries:
-                    - Handle basic greetings naturally
-                    - Process skill-specific searches
-                    - Support experience-based filtering
-                    - Enable qualification comparisons
-
-                    ERROR HANDLING:
-                    1. Data Validation:
-                    - Verify resume accessibility
-                    - Check JD completeness
-                    - Validate matching criteria
-                    - Flag missing information
-
-                    2. Query Processing:
-                    - Request clarification when needed
-                    - Handle ambiguous requirements
-                    - Process partial matches
-                    - Manage conflicting criteria
-
-                    MATCHING CRITERIA:
-                    1. Technical Alignment:
-                    - Required skills match
-                    - Technology stack overlap
-                    - Tool/platform experience
-                    - Programming languages
-
-                    2. Experience Fit:
-                    - Years in relevant roles
-                    - Industry experience
-                    - Project scope alignment
-                    - Leadership requirements
-
-                    3. Education/Certification:
-                    - Degree requirements
-                    - Professional certifications
-                    - Continuing education
-                    - Specialized training
-
-                    4. Soft Skills:
-                    - Communication abilities
-                    - Team collaboration
-                    - Project management
-                    - Problem-solving
-
-                    OUTPUT REQUIREMENTS:
-                    1. Standard Response:
-                    - Match percentage
-                    - Key qualifications met
-                    - Notable gaps
-                    - Specific recommendations
-
-                    2. Detailed Analysis:
-                    - Skill-by-skill breakdown
-                    - Experience comparison
-                    - Education alignment
-                    - Certification matches
-
-                    3. Documentation:
-                    - Resume access links
-                    - Match justification
-                    - Alternative candidates
-                    - Improvement suggestions
-                    """
+    OUTPUT REQUIREMENTS:
+    - Always use Markdown formatting
+    - Include data summaries when relevant
+    - Maintain consistent response structure
+    """
 
     prompt = PromptTemplate.from_template(template)
     llm = ChatGoogleGenerativeAI(
@@ -764,6 +995,13 @@ def run():
     with app.app_context():
         db.create_all()
     app.run(debug=True)
+
+
+@app.template_filter("debug")
+def debug_filter(value):
+    print(f"Debug - Value type: {type(value)}")
+    print(f"Debug - Value: {value}")
+    return value
 
 
 if __name__ == "__main__":

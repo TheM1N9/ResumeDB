@@ -1,133 +1,98 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Login</title>
-    <style>
-      body {
-        /* background-image: url("https://user-images.githubusercontent.com/103044819/220179083-16f84162-1507-4d73-935b-848c267648c6.jpg"); */
-        background-size: cover;
-        background-repeat: no-repeat;
-        background-position: center center;
-        margin: 0;
-        font-family: Arial, sans-serif;
-        background-color: #f7f7f7;
-      }
+{% extends "base.html" %} {% block title %}Login - ResumeDB{% endblock %} {%
+block extra_css %}
+<style>
+  .auth-container {
+    max-width: 400px;
+    margin: 2rem auto;
+    background: white;
+    padding: 2rem;
+    border-radius: 1rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  }
 
-      .container {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: 100vh;
-      }
+  .auth-title {
+    text-align: center;
+    margin-bottom: 2rem;
+    color: var(--text-color);
+  }
 
-      h1 {
-        color: #2c3e50;
-        font-size: 2.5em;
-        margin-bottom: 20px;
-      }
+  .form-group {
+    margin-bottom: 1.5rem;
+  }
 
-      form {
-        background-color: #fff;
-        padding: 30px; /* Increased padding for smaller screens */
-        border-radius: 5px;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        width: 300px;
-        text-align: center;
-      }
+  .form-label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--text-color);
+    font-weight: 500;
+  }
 
-      input[type="email"],
-      input[type="text"],
-      input[type="password"] {
-        width: 100%;
-        padding: 14px 20px; /* Increased padding for smaller screens */
-        margin: 8px 0;
-        box-sizing: border-box;
-        border: 1px solid #ddd;
-        border-radius: 5px;
-      }
+  .form-input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    transition: border-color 0.2s;
+  }
 
-      button[type="submit"] {
-        background-color: #3498db;
-        color: #fff;
-        border: none;
-        padding: 15px 30px;
-        border-radius: 5px;
-        cursor: pointer;
-        font-size: 1em;
-        transition: background-color 0.3s ease;
-        margin-top: 20px;
-      }
+  .form-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+  }
 
-      button[type="submit"]:hover {
-        background-color: #2980b9;
-      }
+  .auth-btn {
+    width: 100%;
+    padding: 0.75rem;
+    font-size: 1rem;
+  }
 
-      /* Media Queries for responsiveness */
-      @media only screen and (max-width: 768px) {
-        form {
-          width: 80%;
-        }
+  .auth-footer {
+    text-align: center;
+    margin-top: 1.5rem;
+  }
 
-        input[type="email"],
-        input[type="text"],
-        input[type="password"] {
-          padding: 12px 18px; /* Adjusted padding for smaller screens */
-        }
+  .auth-footer a {
+    color: var(--primary-color);
+    text-decoration: none;
+  }
 
-        button {
-          padding: 14px 18px; /* Adjusted padding for smaller screens */
-        }
-      }
+  .auth-footer a:hover {
+    text-decoration: underline;
+  }
+</style>
+{% endblock %} {% block content %}
+<div class="auth-container">
+  <h1 class="auth-title">Welcome Back</h1>
 
-      @media only screen and (max-width: 480px) {
-        form {
-          width: 90%;
-        }
-      }
-      .flash-message {
-        background-color: #f04e4e; /* Example: Yellow background for warning */
-        color: #fff;
-        padding: 10px;
-        border-radius: 5px;
-        margin-bottom: 10px;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="container">
-      <form method="POST" action="{{ url_for('login') }}">
-        <h1>Login</h1>
-        {% with messages = get_flashed_messages() %} {% if messages %}
-        <div class="flash-message">
-          {% for message in messages %} {{ message }} {% endfor %}
-        </div>
-        {% endif %} {% endwith %}
-        <!-- <label for="username"></label> -->
-        <!-- <br /> -->
-        <input
-          type="text"
-          id="username"
-          name="username"
-          placeholder="Username"
-          required
-        />
-        <!-- <label for="password"></label> -->
-
-        <input
-          type="password"
-          id="password"
-          name="password"
-          placeholder="Password"
-          required
-        />
-        <button type="submit">Login</button>
-        <br />
-        <p>
-          Don't have an account? <a href="{{ url_for('signup') }}">Signup</a>
-        </p>
-      </form>
+  <form method="POST" action="{{ url_for('login') }}">
+    <div class="form-group">
+      <label for="username" class="form-label">Username</label>
+      <input
+        type="text"
+        id="username"
+        name="username"
+        class="form-input"
+        required
+      />
     </div>
-  </body>
-</html>
+
+    <div class="form-group">
+      <label for="password" class="form-label">Password</label>
+      <input
+        type="password"
+        id="password"
+        name="password"
+        class="form-input"
+        required
+      />
+    </div>
+
+    <button type="submit" class="btn btn-primary auth-btn">Login</button>
+  </form>
+
+  <div class="auth-footer">
+    <p>Don't have an account? <a href="{{ url_for('signup') }}">Sign up</a></p>
+  </div>
+</div>
+{% endblock %}

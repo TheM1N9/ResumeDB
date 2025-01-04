@@ -1,160 +1,730 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <title>Uploaded Resumes</title>
-    <style>
-      body {
-        font-family: "Arial", sans-serif;
-        background-color: #f4f4f9;
-        color: #333;
-        margin: 0;
-        padding: 0;
-      }
+{% extends "base.html" %} {% block title %}Uploaded Resumes - ResumeDB{%
+endblock %} {% block extra_css %}
+<style>
+  .resumes-container {
+    max-width: 800px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+  }
 
-      h1 {
-        text-align: center;
-        color: #2980b9;
-        margin-top: 30px;
-      }
+  .resumes-title {
+    text-align: center;
+    margin-bottom: 2rem;
+    color: var(--text-color);
+  }
 
-      ul {
-        list-style: none;
-        padding: 0;
-        margin: 20px auto;
-        max-width: 600px;
-      }
+  .resumes-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
 
-      li {
-        background: #fff;
-        margin: 10px 0;
-        padding: 15px;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        transition: all 0.3s ease;
-      }
+  .resume-item {
+    background: white;
+    margin-bottom: 1rem;
+    padding-inline: 1.5rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    border: 1px solid var(--border-color);
+  }
 
-      li:hover {
-        background: #2980b9;
-        color: #fff;
-        transform: translateY(-5px);
-      }
+  .resume-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border-color: var(--primary-color);
+  }
 
-      a {
-        text-decoration: none;
-        color: inherit;
-        font-weight: bold;
-      }
+  .resume-link {
+    text-decoration: none;
+    color: var(--text-color);
+    display: block;
+    font-weight: 500;
+  }
 
-      a:hover {
-        text-decoration: underline;
-      }
+  .resume-link:hover {
+    color: var(--primary-color);
+  }
 
-      .back-link {
-        display: block;
-        text-align: center;
-        margin-top: 20px;
-        font-size: 18px;
-      }
+  .actions-container {
+    margin-top: 2rem;
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
 
-      .back-link a {
-        color: #2980b9;
-        text-decoration: none;
-        font-weight: bold;
-      }
+  .download-btn {
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
 
-      .back-link a:hover {
-        text-decoration: underline;
-      }
+  .download-btn svg {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
 
-      button {
-        background-color: #2980b9;
-        color: white;
-        padding: 10px 20px;
-        border: none;
-        border-radius: 5px;
-        font-size: 16px;
-        cursor: pointer;
-        transition: background-color 0.3s ease;
-        display: block;
-        margin: 20px auto;
-        max-width: 200px;
-      }
+  .pagination {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-top: 2rem;
+  }
 
-      button:hover {
-        background-color: #21618c;
-      }
+  .pagination a,
+  .pagination strong {
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    text-decoration: none;
+    transition: all 0.2s;
+  }
 
-      /* ... (rest of your CSS) ... */
+  .pagination a {
+    background-color: white;
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+  }
 
-.pagination {
-  display: flex;
-  justify-content: center;
-  margin-top: 20px;
-}
+  .pagination strong {
+    background-color: var(--primary-color);
+    color: white;
+    border: 1px solid var(--primary-color);
+  }
 
-.pagination a {
-  display: inline-block;
-  padding: 8px 12px;
-  margin: 0 5px;
-  border: 1px solid #ddd;
-  border-radius: 5px;
-  text-decoration: none;
-  color: #333;
-  font-weight: bold;
-}
+  .pagination a:hover {
+    background-color: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+  }
 
-.pagination a:hover {
-  background-color: #2980b9;
-  color: #fff;
-}
+  .empty-state {
+    text-align: center;
+    padding: 3rem;
+    background: white;
+    border-radius: 0.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
 
-.pagination strong {
-  display: inline-block;
-  padding: 8px 12px;
-  margin: 0 5px;
-  border: 1px solid #ddd;
-  border-radius: 5px;
-  background-color: #2980b9;
-  color: #fff;
-  font-weight: bold;
-}
-      
-    </style>
-  </head>
-  <body>
-    <h1>Uploaded Resumes</h1>
-    <ul>
-      {% for resume in resumes %}
-      <a href="{{ url_for('uploaded_file', filename=resume.id) }}">
-        <li>{{ resume.name }}</li>
-      </a>
+  .empty-state p {
+    color: var(--text-color);
+    margin-bottom: 1rem;
+  }
+
+  .role-filter {
+    max-width: 800px;
+    margin: 0 auto 2rem;
+    padding: 0 1rem;
+  }
+
+  .role-filter select {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    background-color: white;
+    font-size: 1rem;
+    color: var(--text-color);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .role-filter select:hover {
+    border-color: var(--primary-color);
+  }
+
+  .role-filter select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+  }
+
+  .resume-info {
+    flex: 1;
+  }
+
+  .resume-roles {
+    font-size: 0.875rem;
+    color: var(--text-color-light);
+    margin-top: 0.5rem;
+  }
+
+  .resume-roles strong {
+    color: var(--text-color);
+    font-weight: 500;
+  }
+
+  .resume-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .action-btn {
+    padding: 0.5rem;
+    padding-bottom: 0;
+    border-radius: 0.375rem;
+    border: 1px solid var(--border-color);
+    background: white;
+    color: var(--text-color);
+    transition: all 0.2s;
+  }
+
+  .action-btn:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+  }
+
+  .action-btn svg {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  .header-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    max-width: 800px;
+    margin: 0 auto 2rem;
+    padding: 0 1rem;
+  }
+
+  .resumes-title {
+    margin: 0;
+    color: var(--text-color);
+  }
+
+  .role-filter {
+    margin: 0;
+    width: 300px;
+  }
+
+  @media (max-width: 640px) {
+    .header-container {
+      flex-direction: column;
+      gap: 1rem;
+    }
+    
+    .role-filter {
+      width: 100%;
+    }
+  }
+
+  .resume-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+  }
+
+  .resume-info {
+    flex: 1;
+  }
+
+  .resume-name {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-color);
+    margin-bottom: 0.5rem;
+  }
+
+  .resume-details {
+    margin-top: 1rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+  }
+
+  .detail-section {
+    background: var(--background-color);
+    padding: 1rem;
+    border-radius: 0.375rem;
+    border: 1px solid var(--border-color);
+  }
+
+  .detail-section h3 {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-color);
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+  }
+
+  .detail-content {
+    font-size: 0.875rem;
+    color: var(--text-color);
+  }
+
+  .detail-content div {
+    margin-bottom: 0.5rem;
+  }
+
+  .skills-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .skill-tag {
+    background: var(--primary-color);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 1rem;
+    font-size: 0.75rem;
+  }
+
+  .education-item {
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .education-item:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+  }
+
+  .education-degree {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+  }
+
+  .education-institution {
+    color: var(--text-color-light);
+  }
+
+  .education-details {
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+  }
+
+  .contact-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+
+  .contact-label {
+    font-weight: 500;
+    min-width: 80px;
+  }
+
+  .contact-value {
+    color: var(--text-color);
+  }
+
+  .contact-value a {
+    color: var(--primary-color);
+    text-decoration: none;
+  }
+
+  .contact-value a:hover {
+    text-decoration: underline;
+  }
+
+  .achievements-list {
+    list-style-type: disc;
+    padding-left: 1.25rem;
+    margin: 0.5rem 0;
+  }
+
+  .achievements-list li {
+    margin-bottom: 0.25rem;
+  }
+
+  .certification-item {
+    margin-bottom: 0.75rem;
+  }
+
+  .certification-name {
+    font-weight: 500;
+  }
+
+  .certification-institution {
+    color: var(--text-color-light);
+    font-size: 0.875rem;
+  }
+
+  .resume-details-wrapper {
+    width: 100%;
+  }
+
+  .resume-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .resume-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .resume-content {
+    padding: 1rem;
+    border-top: 1px solid var(--border-color);
+  }
+
+  details[open] .action-btn svg {
+    transform: rotate(180deg);
+  }
+
+  .action-btn svg {
+    transition: transform 0.2s ease;
+  }
+
+  .resume-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .action-btn {
+    background: none;
+    border: none;
+    padding: 0.5rem;
+    cursor: pointer;
+    color: var(--text-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .action-btn:hover {
+    color: var(--primary-color);
+  }
+
+  .role-item {
+    margin-top: 0.5rem;
+    padding-left: 1rem;
+  }
+
+  .qualifications, .skill-gaps {
+    margin-top: 0.25rem;
+    color: var(--text-color-light);
+  }
+
+  .skill-gaps {
+    color: #dc2626;  /* red color for skill gaps */
+  }
+
+  .resume-roles-summary {
+    font-size: 0.875rem;
+    color: var(--text-color-light);
+    margin-top: 0.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .role-tag {
+    background: var(--primary-color);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 1rem;
+    font-size: 0.75rem;
+    opacity: 0.9;
+  }
+
+  .role-analysis-item {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .role-analysis-item:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+  }
+
+  .role-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: var(--text-color);
+  }
+
+  .qualifications, .skill-gaps {
+    margin-top: 1rem;
+  }
+
+  .qualification-tag {
+    background: #059669;  /* green color for qualifications */
+  }
+
+  .gap-tag {
+    background: #dc2626;  /* red color for skill gaps */
+  }
+</style>
+{% endblock %} {% block content %}
+<div class="header-container">
+  <h1 class="resumes-title">Uploaded Resumes</h1>
+  <div class="role-filter">
+    <select onchange="window.location.href=this.value">
+      <option value="{{ url_for('list_resumes') }}" {% if not current_role %}selected{% endif %}>All Roles</option>
+      {% for role in available_roles %}
+        <option value="{{ url_for('list_resumes', role=role) }}" {% if current_role == role %}selected{% endif %}>
+          {{ role }}
+        </option>
       {% endfor %}
-    </ul>
+    </select>
+  </div>
+</div>
+
+<div class="resumes-container">
+
+  {% if resumes %}
+  <ul class="resumes-list">
+    {% for resume in resumes %}
+    <li class="resume-item">
+      <div class="resume-header">
+        <details class="resume-details-wrapper">
+          <summary class="resume-summary">
+            <div class="resume-info">
+              <div class="resume-name">{{ resume.name }}</div>
+              {% if resume.role_recommendation %}
+                {% set roles = resume.role_recommendation if resume.role_recommendation is mapping else (resume.role_recommendation|from_json if resume.role_recommendation is string else {}) %}
+                {% if roles %}
+                  <div class="resume-roles-summary">
+                    <strong>Suitable for:</strong>
+                    {% for role_key, role in roles.items() %}
+                      {% if role is mapping and role.job_title %}
+                        <span class="role-tag">{{ role.job_title }}</span>
+                      {% endif %}
+                    {% endfor %}
+                  </div>
+                {% endif %}
+              {% endif %}
+            </div>
+            <div class="resume-actions">
+              <button class="action-btn" title="Toggle Details">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="24" height="24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              <a href="{{ url_for('uploaded_file', filename=resume.id) }}" class="action-btn" title="View">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+              </a>
+              <a href="{{ url_for('uploaded_file', filename=resume.id) }}" download class="action-btn" title="Download">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+              </a>
+            </div>
+          </summary>
+
+      <div class="resume-details">
+        {% if resume.contact_details %}
+        <div class="detail-section">
+          <h3>Contact Details</h3>
+          
+          <!-- Debug information -->
+          <!-- <div class="debug-info" style="margin-bottom: 1rem; font-family: monospace; font-size: 0.8rem; background: #f5f5f5; padding: 1rem; border-radius: 4px;">
+            <p>Contact details type: {{ resume.contact_details.__class__.__name__ }}</p>
+            <p>Raw contact data: {{ resume.contact_details | tojson }}</p>
+          </div> -->
+
+          {% set contact = resume.contact_details if resume.contact_details is mapping else (resume.contact_details|from_json if resume.contact_details is string else {}) %}
+          
+          <div class="detail-content">
+            {% for key, value in contact.items() %}
+              <div class="contact-item">
+                <span class="contact-label">{{ key | title }}:</span>
+                <span class="contact-value">
+                  {% if key == 'linkedin' %}
+                    <a href="https://linkedin.com{{ value }}" target="_blank">Profile</a>
+                  {% elif key == 'portfolio' %}
+                    <a href="{{ value }}" target="_blank">View Portfolio</a>
+                  {% elif key == 'email' %}
+                    <a href="mailto:{{ value }}">{{ value }}</a>
+                  {% else %}
+                    {{ value }}
+                  {% endif %}
+                </span>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+        {% if resume.skills %}
+        <div class="detail-section">
+          <h3>Skills</h3>
+          
+          <!-- Debug information -->
+          <!-- <div class="debug-info" style="margin-bottom: 1rem; font-family: monospace; font-size: 0.8rem; background: #f5f5f5; padding: 1rem; border-radius: 4px;">
+            <p>Skills type: {{ resume.skills.__class__.__name__ }}</p>
+            <p>Raw skills data: {{ resume.skills | tojson }}</p>
+          </div> -->
+
+          {% set skills = resume.skills if resume.skills is mapping else (resume.skills|from_json if resume.skills is string else {}) %}
+          
+          <div class="skills-list">
+            {% for category, skill_list in skills.items() %}
+              <div class="skill-category" style="margin-bottom: 1rem;">
+                <h4 style="margin-bottom: 0.5rem; color: var(--text-color);">{{ category | replace('_', ' ') | title }}</h4>
+                <div class="skills-list">
+                  {% for skill in skill_list %}
+                    <span class="skill-tag">{{ skill }}</span>
+                  {% endfor %}
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+        {% if resume.experience %}
+        <div class="detail-section">
+          <h3>Experience</h3>
+          <div class="detail-content">
+            {% set experience = resume.experience if resume.experience is mapping else (resume.experience|from_json if resume.experience is string else {}) %}
+            {% for exp in experience.values() %}
+              <div class="education-item">
+                {% if exp is mapping %}
+                  <div class="education-degree">{{ exp.title }}</div>
+                  {% if exp.company %}
+                    <div class="education-institution">{{ exp.company }}</div>
+                  {% endif %}
+                  {% if exp.dates %}
+                    <div class="education-details">{{ exp.dates }}</div>
+                  {% endif %}
+                  {% if exp.key_achievements %}
+                    <ul class="achievements-list">
+                      {% for achievement in exp.key_achievements %}
+                        <li>{{ achievement }}</li>
+                      {% endfor %}
+                    </ul>
+                  {% endif %}
+                {% else %}
+                  <div class="education-details">{{ exp }}</div>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+        {% if resume.projects %}
+        <div class="detail-section">
+          <h3>Projects</h3>
+          
+          <div class="detail-content">
+            {% set projects = resume.projects if resume.projects is sequence else (resume.projects|from_json if resume.projects is string else []) %}
+            
+            {% for project in projects %}
+              <div class="project-item" style="margin-bottom: 1.5rem;">
+                <div class="project-name" style="font-weight: 600; margin-bottom: 0.5rem;">{{ project.name }}</div>
+                <div class="project-description" style="margin-bottom: 0.5rem;">{{ project.description }}</div>
+                {% if project.technologies %}
+                  <div class="project-tech">
+                    <strong>Technologies:</strong>
+                    <div class="skills-list" style="margin-top: 0.5rem;">
+                      {% for tech in project.technologies %}
+                        <span class="skill-tag">{{ tech }}</span>
+                      {% endfor %}
+                    </div>
+                  </div>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+        {% if resume.role_recommendation %}
+        <div class="detail-section">
+          <h3>Role Analysis</h3>
+          <div class="detail-content">
+            {% set roles = resume.role_recommendation if resume.role_recommendation is mapping else (resume.role_recommendation|from_json if resume.role_recommendation is string else {}) %}
+            {% if roles %}
+              {% for role_key, role in roles.items() %}
+                {% if role is mapping and role.job_title %}
+                  <div class="role-analysis-item">
+                    <div class="role-title">{{ role.job_title }} {% if role.seniority_level %}({{ role.seniority_level }}){% endif %}</div>
+                    {% if role.key_qualifications %}
+                      <div class="qualifications">
+                        <strong>Key Qualifications:</strong>
+                        <div class="skills-list">
+                          {% for qual in role.key_qualifications %}
+                            <span class="skill-tag qualification-tag">{{ qual }}</span>
+                          {% endfor %}
+                        </div>
+                      </div>
+                    {% endif %}
+                    {% if role.skill_gaps %}
+                      <div class="skill-gaps">
+                        <strong>Areas for Development:</strong>
+                        <div class="skills-list">
+                          {% for gap in role.skill_gaps %}
+                            <span class="skill-tag gap-tag">{{ gap }}</span>
+                          {% endfor %}
+                        </div>
+                      </div>
+                    {% endif %}
+                  </div>
+                {% endif %}
+              {% endfor %}
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+
+      </details>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
 
   <div class="pagination">
     {% if page > 1 %}
-        <a href="{{ url_for('list_resumes', page=page-1) }}">Previous</a>
+    <a href="{{ url_for('list_resumes', page=page-1) }}">Previous</a>
+    {% endif %} {% for p in range(1, total_pages + 1) %} {% if p == page %}
+    <strong>{{ p }}</strong>
+    {% else %}
+    <a href="{{ url_for('list_resumes', page=p) }}">{{ p }}</a>
+    {% endif %} {% endfor %} {% if page < total_pages %}
+    <a href="{{ url_for('list_resumes', page=page+1) }}">Next</a>
     {% endif %}
+  </div>
 
-    {% for p in range(1, total_pages + 1) %}
-        {% if p == page %}
-            <strong>{{ p }}</strong>
-        {% else %}
-            <a href="{{ url_for('list_resumes', page=p) }}">{{ p }}</a>
-        {% endif %}
-    {% endfor %}
-
-    {% if page < total_pages %}
-        <a href="{{ url_for('list_resumes', page=page+1) }}">Next</a>
-    {% endif %}
-</div>
-
-    <a href="{{ url_for('download_data') }}">
-      <button>Download data</button>
+  <div class="actions-container">
+    <a
+      href="{{ url_for('download_data') }}"
+      class="btn btn-primary download-btn"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+        />
+      </svg>
+      Download Data
     </a>
-    <div class="back-link">
-      <a href="{{ url_for('index') }}">Back to upload</a>
-    </div>
-  </body>
-</html>
+    <a href="{{ url_for('upload') }}" class="btn btn-outline"> Upload More </a>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <p>No resumes uploaded yet.</p>
+    <a href="{{ url_for('upload') }}" class="btn btn-primary">Upload Resumes</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

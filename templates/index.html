@@ -1,241 +1,437 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta
-      name="description"
-      content="ResumeDB - Your ultimate solution for smart, efficient, and accurate resume management."
-    />
-    <meta property="og:title" content="ResumeDB - Welcome" />
-    <meta
-      property="og:description"
-      content="Your ultimate solution for smart, efficient, and accurate resume management."
-    />
-    <meta property="og:image" content="resumedb.jpg" />
-    <meta property="og:url" content="your_page_url" />
-    <title>ResumeDB - Welcome</title>
-    <link rel="stylesheet" href="styles.css" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap"
-      rel="stylesheet"
-    />
-    <style>
-      /* Reset and Base Styles */
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-      }
+{% extends "base.html" %} {% block title %}ResumeDB - AI-Powered Resume
+Management{% endblock title %} {% block extra_css %}
+<style>
+  /* Core styles */
+  :root {
+    --gradient-start: #4f46e5;
+    --gradient-end: #2563eb;
+    --accent-color: #22d3ee;
+    --text-light: #f8fafc;
+    --text-dark: #0f172a;
+  }
 
-      body {
-        font-family: "Poppins", sans-serif;
-        line-height: 1.6;
-        color: #333;
-        background-color: #f7f8fc;
-      }
+  /* Hero Section */
+  .hero {
+    position: relative;
+    min-height: 100vh;
+    background: linear-gradient(
+      135deg,
+      var(--gradient-start),
+      var(--gradient-end)
+    );
+    overflow: hidden;
+  }
 
-      /* Navigation */
-      header nav {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 1rem 5%;
-        background-color: #fff;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-      }
+  .hero::before {
+    content: "";
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  }
 
-      .logo {
-        font-size: 1.5rem;
-        font-weight: 600;
-        color: #007bff;
-      }
+  .hero-content {
+    position: relative;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 8rem 2rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4rem;
+    align-items: center;
+  }
 
-      nav ul {
-        list-style: none;
-        display: flex;
-        gap: 1rem;
-      }
+  /* Left Column */
+  .hero-text {
+    color: var(--text-light);
+  }
 
-      nav ul li {
-        display: inline;
-      }
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    padding: 0.5rem 1rem;
+    border-radius: 2rem;
+    margin-bottom: 2rem;
+    font-size: 0.875rem;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    animation: slideIn 0.8s ease-out;
+  }
 
-      nav ul li a {
-        color: #007bff;
-        text-decoration: none;
-        padding: 0.5rem 1rem;
-        font-weight: 500;
-      }
+  .hero-badge span {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    background: var(--accent-color);
+    border-radius: 1rem;
+    margin-left: 0.5rem;
+    font-weight: 500;
+  }
 
-      nav ul li a.login-btn {
-        background-color: #007bff;
-        color: #fff;
-        border-radius: 5px;
-        transition: background-color 0.3s ease;
-      }
+  .hero-title {
+    font-size: 4rem;
+    font-weight: 700;
+    line-height: 1.1;
+    margin-bottom: 1.5rem;
+    animation: slideUp 0.8s ease-out 0.2s backwards;
+  }
 
-      nav ul li a.login-btn:hover {
-        background-color: #0056b3;
-      }
+  .hero-subtitle {
+    font-size: 1.25rem;
+    line-height: 1.6;
+    opacity: 0.9;
+    margin-bottom: 3rem;
+    animation: slideUp 0.8s ease-out 0.4s backwards;
+  }
 
-      /* Welcome Section */
-      .welcome-section {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 5rem 10%;
-        background: linear-gradient(to right, #007bff, #00c6ff);
-        color: #fff;
-        min-height: 80vh;
-        flex-wrap: wrap;
-        text-align: center;
-      }
+  /* Stats Section */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2rem;
+    margin-top: 4rem;
+    animation: slideUp 0.8s ease-out 0.6s backwards;
+  }
 
-      .content {
-        max-width: 50%;
-      }
+  .stat-item {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    padding: 1.5rem;
+    border-radius: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
 
-      .content h1 {
-        font-size: 3rem;
-        margin-bottom: 1rem;
-      }
+  .stat-number {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(to right, #fff, var(--accent-color));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
 
-      .content p {
-        font-size: 1.2rem;
-        margin-bottom: 2rem;
-      }
+  .stat-label {
+    font-size: 0.875rem;
+    opacity: 0.9;
+  }
 
-      .buttons {
-        display: flex;
-        gap: 1rem;
-        flex-wrap: wrap;
-        justify-content: center;
-      }
+  /* Right Column */
+  .hero-visual {
+    position: relative;
+    animation: float 6s ease-in-out infinite;
+  }
 
-      .buttons .btn {
-        padding: 1rem 2rem;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-        text-decoration: none;
-        font-size: 1rem;
-        transition: transform 0.2s ease;
-      }
+  .feature-cards {
+    position: relative;
+    display: grid;
+    gap: 1rem;
+  }
 
-      .buttons .primary-btn {
-        background-color: #28a745;
-        color: #fff;
-      }
+  .feature-card {
+    background: rgba(255, 255, 255, 0.95);
+    padding: 2rem;
+    border-radius: 1rem;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease;
+  }
 
-      .buttons .secondary-btn {
-        background-color: #6c757d;
-        color: #fff;
-      }
+  .feature-card:hover {
+    transform: translateY(-5px);
+  }
 
-      .buttons .btn:hover {
-        transform: scale(1.05);
-      }
+  .feature-icon {
+    width: 3rem;
+    height: 3rem;
+    background: var(--gradient-start);
+    border-radius: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1rem;
+  }
 
-      .logout-btn {
-        background-color: #dc3545;
-        color: #fff;
-        /* padding: 1rem 2rem; */
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-        text-decoration: none;
-        font-size: 1rem;
-        transition: transform 0.2s ease;
-      }
+  .feature-icon svg {
+    width: 1.5rem;
+    height: 1.5rem;
+    color: white;
+  }
 
-      .image-container {
-        max-width: 40%;
-      }
+  .feature-title {
+    color: var(--text-dark);
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
 
-      .image-container img {
-        width: auto;
-        height: 400px;
-      }
+  .feature-description {
+    color: #64748b;
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
 
-      /* Footer */
-      footer {
-        text-align: center;
-        padding: 2rem 0;
-        background-color: #f7f8fc;
-      }
+  /* CTA Section */
+  .cta-buttons {
+    display: flex;
+    gap: 1rem;
+    margin-top: 3rem;
+    animation: slideUp 0.8s ease-out 0.8s backwards;
+  }
 
-      footer p {
-        color: #6c757d;
-        font-size: 0.9rem;
-      }
+  .cta-button {
+    padding: 1rem 2rem;
+    border-radius: 0.75rem;
+    font-weight: 500;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+  }
 
-      @media (max-width: 768px) {
-        .welcome-section {
-          flex-direction: column;
-          text-align: center;
-        }
+  .cta-primary {
+    background: var(--accent-color);
+    color: var(--text-dark);
+  }
 
-        .image-container img {
-          height: auto;
-          width: 80%;
-        }
+  .cta-primary:hover {
+    background: #0ea5e9;
+    transform: translateY(-2px);
+  }
 
-        .content {
-          max-width: 100%;
-        }
-      }
-    </style>
-  </head>
+  .cta-secondary {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--text-light);
+  }
 
-  <body>
-    <header>
-      <nav>
-        <div class="logo">ResumeDB</div>
-        <ul>
-          {% if not current_user.is_authenticated %}
-          <li>
-            <a href="{{ url_for('login') }}" class="btn login-btn">Login</a>
-          </li>
-          <li>
-            <a href="{{ url_for('signup') }}" class="btn login-btn">Signup</a>
-          </li>
-          {% else %}
-          <li>
-            <a href="{{ url_for('logout') }}" class="btn logout-btn">Logout</a>
-          </li>
-          {% endif %}
-        </ul>
-      </nav>
-    </header>
+  .cta-secondary:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-2px);
+  }
 
-    <main>
-      <section class="welcome-section">
-        <div class="content">
-          <h1>Welcome to ResumeDB</h1>
-          <p>
-            Your ultimate solution for smart, efficient, and accurate resume
-            management.
-          </p>
-          <div class="buttons">
-            <a href="/upload" class="btn primary-btn">Upload Resume</a>
-            <a href="/resumes" class="btn secondary-btn">View Resumes</a>
-            <a href="/chat" class="btn primary-btn">Start Chat</a>
+  /* Animations */
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateX(-20px);
+    }
+  }
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+  }
+
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-20px);
+    }
+  }
+
+  /* Responsive Design */
+  @media (max-width: 1024px) {
+    .hero-content {
+      grid-template-columns: 1fr;
+      text-align: center;
+      gap: 2rem;
+    }
+
+    .hero-title {
+      font-size: 3rem;
+    }
+
+    .stats {
+      justify-content: center;
+    }
+
+    .cta-buttons {
+      justify-content: center;
+    }
+
+    .feature-cards {
+      max-width: 500px;
+      margin: 0 auto;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .hero-content {
+      padding: 6rem 1rem;
+    }
+
+    .hero-title {
+      font-size: 2.5rem;
+    }
+
+    .stats {
+      grid-template-columns: 1fr;
+    }
+
+    .cta-buttons {
+      flex-direction: column;
+    }
+
+    .cta-button {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+</style>
+{% endblock extra_css %} {% block content %}
+<section class="hero">
+  <div class="hero-content">
+    <div class="hero-text">
+      <div class="hero-badge">Powered by AI <span>New</span></div>
+
+      <h1 class="hero-title">Smart Resume Management Reimagined</h1>
+
+      <p class="hero-subtitle">
+        Transform your hiring process with AI-powered resume analysis,
+        intelligent matching, and deep insights that help you find the perfect
+        candidates faster.
+      </p>
+
+      <div class="cta-buttons">
+        {% if not current_user.is_authenticated %}
+        <a href="{{ url_for('signup') }}" class="cta-button cta-primary">
+          Get Started Free
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+            <polyline points="12 5 19 12 12 19"></polyline>
+          </svg>
+        </a>
+        <a href="{{ url_for('login') }}" class="cta-button cta-secondary">
+          Sign In
+        </a>
+        {% else %}
+        <a href="{{ url_for('upload') }}" class="cta-button cta-primary">
+          Upload Resumes
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="17 8 12 3 7 8"></polyline>
+            <line x1="12" y1="3" x2="12" y2="15"></line>
+          </svg>
+        </a>
+        <a href="{{ url_for('chat') }}" class="cta-button cta-secondary">
+          Open AI Chat
+        </a>
+        {% endif %}
+      </div>
+
+      <div class="stats">
+        <div class="stat-item">
+          <div class="stat-number">98%</div>
+          <div class="stat-label">Accuracy Rate</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-number">2x</div>
+          <div class="stat-label">Faster Hiring</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-number">24/7</div>
+          <div class="stat-label">AI Support</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hero-visual">
+      <div class="feature-cards">
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+              />
+            </svg>
           </div>
+          <h3 class="feature-title">Smart Resume Parsing</h3>
+          <p class="feature-description">
+            Automatically extract and organize key information from resumes with
+            high accuracy.
+          </p>
         </div>
-        <div class="image-container">
-          <img
-            src="static/images/resume_Picture.png"
-            alt="Resume Management Illustration"
-          />
-        </div>
-      </section>
-    </main>
 
-    <footer>
-      <p>© 2024 ResumeDB. All rights reserved.</p>
-    </footer>
-  </body>
-</html>
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M13 10V3L4 14h7v7l9-11h-7z"
+              />
+            </svg>
+          </div>
+          <h3 class="feature-title">AI-Powered Matching</h3>
+          <p class="feature-description">
+            Find the perfect candidates using advanced AI matching algorithms.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+              />
+            </svg>
+          </div>
+          <h3 class="feature-title">Analytics & Insights</h3>
+          <p class="feature-description">
+            Get detailed analytics and insights about your candidate pool.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock content %}
