@@ -5,7 +5,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from pydantic import SecretStr
 from langchain_core.output_parsers import StrOutputParser
-from nlqs.parameters import OPENAI_API_KEY
+from nlqs.parameters import GEMINI_API_KEY
 from nlqs.database.sqlite import SQLiteDriver
 from nlqs.database.postgres import PostgresDriver
 import pandas as pd
@@ -62,7 +62,7 @@ def get_column_descriptions(dataframe) -> dict:
 
         llm = ChatOpenAI(
             model="gpt-4",
-            api_key=SecretStr(OPENAI_API_KEY),
+            api_key=SecretStr(GEMINI_API_KEY),
             temperature=0.0,
             verbose=True,
         )

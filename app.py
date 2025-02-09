@@ -56,7 +56,7 @@ from sqlalchemy import (
 
 load_dotenv()
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "Enter api key...")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "Enter api key...")
 SECRET_KEY = os.getenv("SECRET_KEY", "fallback_secret_key")
 DATABASE_URI = os.getenv("DATABASE_URI", "sqlite:///resumes.db")
 
@@ -294,7 +294,7 @@ def generate_data(text):
 
     prompt = PromptTemplate.from_template(template)
     llm = ChatGoogleGenerativeAI(
-        api_key=SecretStr(OPENAI_API_KEY),
+        api_key=SecretStr(GEMINI_API_KEY),
         model="gemini-2.0-flash-exp",
         temperature=0.5,
     )
@@ -971,7 +971,7 @@ def generate_final_response(data, query, chat_history):
 
     prompt = PromptTemplate.from_template(template)
     llm = ChatGoogleGenerativeAI(
-        api_key=SecretStr(OPENAI_API_KEY),
+        api_key=SecretStr(GEMINI_API_KEY),
         temperature=0.3,
         model="gemini-2.0-flash-exp",
     )

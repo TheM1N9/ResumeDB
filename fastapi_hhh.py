@@ -37,7 +37,7 @@ from sqlalchemy import (
     text,
     DateTime,
 )
-from sqlalchemy.orm import sessionmaker, declarative_base, Session
+from sqlalchemy.orm import declarative_base, Session
 from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
 from nlqs.database.sqlite import SQLiteConnectionConfig
@@ -54,7 +54,7 @@ from fastapi.staticfiles import StaticFiles
 load_dotenv()
 
 # Constants
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "Enter api key...")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "Enter api key...")
 SECRET_KEY = os.getenv("SECRET_KEY", "fallback_secret_key")
 DATABASE_URI = os.getenv("DATABASE_URI", "sqlite:///resumes.db")
 
@@ -404,7 +404,7 @@ def generate_data(text):
     create a json format of the resume with all the key details. resume: {text}"""
 
     prompt = PromptTemplate.from_template(template)
-    llm = ChatOpenAI(api_key=SecretStr(OPENAI_API_KEY), temperature=0.5)
+    llm = ChatOpenAI(api_key=SecretStr(GEMINI_API_KEY), temperature=0.5)
     json_llm = llm.bind(response_format={"type": "json_object"})
     llm_chain = prompt | json_llm
     question = (
@@ -572,7 +572,7 @@ def generate_final_response(data, query, chat_history):
 
     prompt = PromptTemplate.from_template(template)
     llm = ChatOpenAI(
-        api_key=SecretStr(OPENAI_API_KEY), temperature=0.7, model="gpt-4-turbo"
+        api_key=SecretStr(GEMINI_API_KEY), temperature=0.7, model="gpt-4-turbo"
     )
     output_parser = StrOutputParser()
     chain = prompt | llm | output_parser

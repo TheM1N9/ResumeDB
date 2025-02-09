@@ -18,7 +18,7 @@ from pathlib import Path
 # from langchain_openai import ChatOpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import SecretStr
-from nlqs.parameters import OPENAI_API_KEY
+from nlqs.parameters import GEMINI_API_KEY
 from nlqs.parameters import LOGGER_FILE
 
 # Create a logger object
@@ -69,7 +69,7 @@ class NLQS:
         self.llm = ChatGoogleGenerativeAI(
             temperature=0,
             model="gemini-2.0-flash-exp",
-            api_key=SecretStr(OPENAI_API_KEY),
+            api_key=SecretStr(GEMINI_API_KEY),
             max_tokens=1000,
         )
 

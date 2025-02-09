@@ -1,7 +1,5 @@
 Flask==3.0.3
 pypdf==4.2.0
-langchain-openai==0.1.13
-langchain-community==0.2.6
 python-dotenv==1.0.1
 sqlalchemy==2.0.31
 gradio==4.37.2
@@ -12,3 +10,7 @@ flask-sqlalchemy==3.1.1
 flask-login==0.6.3
 werkzeug==3.0.4
 filetype==1.2.0
+langchain-google-genai==2.0.7
+langchain-openai==0.2.14
+langchain-community==0.3.13
+pydantic==2.9.1

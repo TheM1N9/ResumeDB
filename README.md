@@ -26,12 +26,12 @@ This AI agent helps recruiters find the most suitable candidates efficiently and
 
 ## Installation and Setup
 
-### Step 1: Install Poetry
+### Step 1: Install virtual environment
 
-If you haven't installed Poetry yet, install it using pip:
+If you haven't installed virtual environment yet, install it using pip:
 
 ```sh
-pip install poetry
+pip install virtualenv
 ```
 
 ### Step 2: Install Dependencies
@@ -39,21 +39,20 @@ pip install poetry
 Navigate to the project directory and install the required packages using Poetry:
 
 ```sh
-poetry install
+python -m venv .venv
 ```
 
 Activate the virtual environment:
 
 ```sh
-poetry shell
+.venv/scripts/activate
 ```
 
-### Step 3: Navigate to the Organization Folder
+### Step 3: Set up .env File
 
-For both Windows and Linux machines, change the directory to the organization folder:
 
 ```sh
-cd organisation
+copy sample.env  to .env and update the values accordingly
 ```
 
 ### Step 4: Run the Flask App
