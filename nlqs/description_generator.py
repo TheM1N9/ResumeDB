@@ -2,7 +2,7 @@ from typing import List, Optional, Union
 import chromadb
 from langchain.chains import LLMChain
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import SecretStr
 from langchain_core.output_parsers import StrOutputParser
 from nlqs.parameters import GEMINI_API_KEY
@@ -12,7 +12,6 @@ import pandas as pd
 import re
 
 
-# TODO - Use the database Object for doing this
 def get_column_descriptions(dataframe) -> dict:
     """Get column descriptions from OpenAI API."""
     # Initialize an empty dictionary to store column descriptions
@@ -60,8 +59,8 @@ def get_column_descriptions(dataframe) -> dict:
             ]
         )
 
-        llm = ChatOpenAI(
-            model="gpt-4",
+        llm = ChatGoogleGenerativeAI(
+            model="gemini-2.0-flash",
             api_key=SecretStr(GEMINI_API_KEY),
             temperature=0.0,
             verbose=True,
