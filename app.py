@@ -148,17 +148,31 @@ class User(UserMixin, db.Model):
         return check_password_hash(self.password, password)
 
 
+class Chat(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    title = db.Column(db.String(150), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    messages = db.relationship(
+        "ConversationHistory", backref="chat", lazy=True, cascade="all, delete-orphan"
+    )
+
+    def __init__(self, user_id, title):
+        self.user_id = user_id
+        self.title = title
+
+
 class ConversationHistory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    chat_id = db.Column(db.Integer, db.ForeignKey("chat.id"), nullable=False)
     timestamp = db.Column(db.DateTime, nullable=False)
     user_message = db.Column(db.Text, nullable=False)
     bot_response = db.Column(db.Text, nullable=False)
 
-    user = db.relationship("User", backref=db.backref("conversations", lazy=True))
-
-    def __init__(self, user_id, timestamp, user_message, bot_response):
+    def __init__(self, user_id, chat_id, timestamp, user_message, bot_response):
         self.user_id = user_id
+        self.chat_id = chat_id
         self.timestamp = timestamp
         self.user_message = user_message
         self.bot_response = bot_response
@@ -411,20 +425,23 @@ def save_data(data, file, username):
         metadata.create_all(db.engine)
 
         resume_data = {
-            "name": data.name,
-            "contact_details": contact_details,
-            "skills": skills,
-            "education": education,
-            "experience": experience,
-            "projects": projects,
-            "certifications": certifications,
-            "achievements": achievements,
-            "role_recommendation": role_recommendation,
+            "name": str(data.name),
+            "contact_details": str(contact_details),
+            "skills": str(skills),
+            "education": str(education),
+            "experience": str(experience),
+            "projects": str(projects),
+            "certifications": str(certifications),
+            "achievements": str(achievements),
+            "role_recommendation": str(role_recommendation),
         }
 
-        if db.session.query(resume_table).filter_by(id=file).first():
+        existing_resume = db.session.query(resume_table).filter_by(id=file).first()
+        if existing_resume:
             # Update existing resume using update()
-            db.session.query(resume_table).filter_by(id=file).update(resume_data)
+            for key, value in resume_data.items():
+                setattr(existing_resume, key, value)
+            db.session.commit()
         else:
             # Insert a new resume
             insert_stmt = resume_table.insert().values(id=file, **resume_data)
@@ -855,80 +872,167 @@ def login():
     return render_template("login.html")
 
 
-@app.route("/chat", methods=["GET", "POST"])
+@app.route("/chat", defaults={"chat_id": None}, methods=["GET", "POST"])
+@app.route("/chat/<int:chat_id>", methods=["GET", "POST"])
 @login_required
-def chat():
-    # Get the user's conversation history from the database
-    messages_db = (
-        db.session.query(ConversationHistory)
-        .filter_by(user_id=current_user.id)
-        .order_by(ConversationHistory.timestamp)
+def chat(chat_id):
+    # Initialize configurations
+    chroma_config = ChromaDBConfig(
+        collection_name=current_user.username, persist_path=Path("chroma")
+    )
+
+    sqlite_config = SQLiteConnectionConfig(
+        db_file=Path("./instance/resumes.db"),
+        dataset_table_name=current_user.username,
+    )
+
+    # Get user's chats
+    user_chats = (
+        Chat.query.filter_by(user_id=current_user.id)
+        .order_by(Chat.created_at.desc())
         .all()
     )
 
-    # Create a list of messages where both user and bot messages are included
-    messages = []
-    for msg in messages_db:
-        if msg.user_message:
-            messages.append({"type": "user", "text": msg.user_message})
-        if msg.bot_response:
-            messages.append({"type": "bot", "text": msg.bot_response})
+    # Get current chat or create a new one
+    current_chat = None
+    if chat_id:
+        current_chat = Chat.query.filter_by(
+            id=chat_id, user_id=current_user.id
+        ).first_or_404()
+    elif user_chats:
+        current_chat = user_chats[0]
+    else:
+        # Create a default chat if user has none
+        current_chat = Chat(user_id=current_user.id, title="New Chat")
+        db.session.add(current_chat)
+        db.session.commit()
+        user_chats = [current_chat]
 
-    if current_user.is_authenticated:
-        chroma_config = ChromaDBConfig(
-            collection_name=current_user.username, persist_path=Path("chroma")
-        )
+    if request.method == "POST":
+        user_query = request.form.get("query")
 
-        sqlite_config = SQLiteConnectionConfig(
-            db_file=Path("./instance/resumes.db"),
-            dataset_table_name=current_user.username,
-        )
-
-        if request.method == "POST":
-            user_query = request.form.get("query")
-
-            if not user_query:
-                return render_template("chat.html", messages=messages)
-
-            # Process the user query using the chatbot
-            nlqs_instance = NLQS(sqlite_config, chroma_config, chroma_client)
-            queried_data = nlqs_instance.execute_nlqs_workflow(user_query, messages)
-
-            response = generate_final_response(
-                data=queried_data, query=user_query, chat_history=messages
-            )
-            print(f"response: {response}")
-
-            # Update conversation history in the database
-            new_message = ConversationHistory(
-                user_id=current_user.id,
-                timestamp=datetime.utcnow(),
-                user_message=user_query,
-                bot_response=response,
-            )
-            db.session.add(new_message)
-            db.session.commit()
-
-            # Check if the request is an AJAX request, return JSON response
+        if not user_query:
             if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-                return jsonify({"response": response})
+                return jsonify({"error": "No query provided"}), 400
+            return render_template(
+                "chat.html", messages=[], chats=user_chats, current_chat=current_chat
+            )
 
-            # For normal requests, render the HTML template
-            messages.append({"type": "user", "text": user_query})
-            messages.append({"type": "bot", "text": response})
+        # Process the user query using the chatbot
+        nlqs_instance = NLQS(sqlite_config, chroma_config, chroma_client)
+        queried_data = nlqs_instance.execute_nlqs_workflow(user_query, [])
 
-    return render_template("chat.html", messages=messages)
+        # Get chat history for context
+        chat_history = []
+        if current_chat:
+            history = (
+                ConversationHistory.query.filter_by(chat_id=current_chat.id)
+                .order_by(ConversationHistory.timestamp)
+                .all()
+            )
+            for msg in history:
+                chat_history.extend(
+                    [
+                        {"type": "user", "text": msg.user_message},
+                        {"type": "bot", "text": msg.bot_response},
+                    ]
+                )
+
+        response = generate_final_response(
+            data=queried_data, query=user_query, chat_history=chat_history
+        )
+
+        # Save conversation to the current chat
+        new_message = ConversationHistory(
+            user_id=current_user.id,
+            chat_id=current_chat.id,
+            timestamp=datetime.utcnow(),
+            user_message=user_query,
+            bot_response=response,
+        )
+        db.session.add(new_message)
+        db.session.commit()
+
+        # Check if the request is an AJAX request
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"response": response})
+
+        # If not AJAX, redirect back to the chat page
+        return redirect(url_for("chat", chat_id=current_chat.id))
+
+    # Get chat messages for GET request
+    messages = []
+    if current_chat:
+        # Use the session instance to query
+        chat_history = (
+            db.session.query(ConversationHistory)
+            .filter_by(chat_id=current_chat.id)
+            .order_by(ConversationHistory.timestamp)
+            .all()
+        )
+
+        for msg in chat_history:
+            messages.extend(
+                [
+                    {"type": "user", "text": msg.user_message},
+                    {"type": "bot", "text": msg.bot_response},
+                ]
+            )
+
+    return render_template(
+        "chat.html", messages=messages, chats=user_chats, current_chat=current_chat
+    )
+
+
+@app.route("/chat/new", methods=["POST"])
+@login_required
+def new_chat():
+    data = request.get_json()
+    title = data.get("title", "New Chat")
+
+    chat = Chat(user_id=current_user.id, title=title)
+    db.session.add(chat)
+    db.session.commit()
+
+    return jsonify({"success": True, "chat_id": chat.id})
+
+
+@app.route("/chat/<int:chat_id>/rename", methods=["POST"])
+@login_required
+def rename_chat(chat_id):
+    chat = Chat.query.filter_by(id=chat_id, user_id=current_user.id).first_or_404()
+
+    data = request.get_json()
+    chat.title = data.get("title", chat.title)
+    db.session.commit()
+
+    return jsonify({"success": True})
+
+
+@app.route("/chat/<int:chat_id>/delete", methods=["POST"])
+@login_required
+def delete_chat(chat_id):
+    chat = Chat.query.filter_by(id=chat_id, user_id=current_user.id).first_or_404()
+    db.session.delete(chat)
+    db.session.commit()
+
+    return jsonify({"success": True})
 
 
 def generate_final_response(data, query, chat_history):
+    print(f"User Query {query}")
     # Get the last n messages for LLM context
-    n = 5  # Number of recent messages to use
-    llm_history = [
-        f"User: {msg['text']}" if msg["type"] == "user" else f"Bot: {msg['text']}"
-        for msg in chat_history[-n:]
-    ]
+    # n = 5  # Number of recent messages to use
+    # llm_history = [
+    #     f"User: {msg['text']}" if msg["type"] == "user" else f"Bot: {msg['text']}"
+    #     for msg in chat_history[-n:]
+    # ]
 
-    llm_history_text = "\n".join(llm_history)
+    # llm_history_text = "\n".join(llm_history)
+    print("-------------------------------------------------")
+    print(f"LLM history: {chat_history}")
+    print("-------------------------------------------------")
+
     template = """
     ResumeDB Assistant - An AI-powered Resume Analysis System by M1N9
 
@@ -940,9 +1044,9 @@ def generate_final_response(data, query, chat_history):
     - Never fabricate responses - use only provided data
 
     2. Query Handling:
-    - Process user input: {query}
+    - User Query: {query}
     - Reference database: {data}
-    - Consider context: {chat_history}
+    - Consider context (Chat history): {chat_history}
 
     3. Response Protocol:
     - Format all outputs in Markdown
@@ -967,18 +1071,22 @@ def generate_final_response(data, query, chat_history):
     - Always use Markdown formatting
     - Include data summaries when relevant
     - Maintain consistent response structure
+
+    User Query: {query}
     """
 
     prompt = PromptTemplate.from_template(template)
     llm = ChatGoogleGenerativeAI(
         api_key=SecretStr(GEMINI_API_KEY),
         temperature=0.3,
-        model="gemini-2.0-flash-exp",
+        model="gemini-2.0-pro-exp",
     )
     chain = prompt | llm | StrOutputParser()
     response = chain.invoke(
-        {"data": data, "query": query, "chat_history": llm_history_text}
+        {"query": query, "data": data, "chat_history": chat_history}
     )
+
+    print(f"Response: {response.strip()}")
 
     return response.strip()
 
