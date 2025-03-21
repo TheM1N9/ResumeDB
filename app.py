@@ -1,4 +1,5 @@
 from datetime import datetime
+from fileinput import filename
 import os
 import json
 from pathlib import Path
@@ -22,8 +23,6 @@ from werkzeug.utils import secure_filename
 from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-
-# from langchain_openai import ChatOpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
 from dataclasses import dataclass
 from typing import Dict, List
@@ -107,6 +106,7 @@ def create_user_table(username):
         username,
         metadata,
         db.Column("id", db.String, primary_key=True),
+        db.Column("filename", db.String, nullable=False),
         db.Column("name", db.String, nullable=False),
         db.Column("contact_details", db.JSON, nullable=False),
         db.Column("skills", db.JSON, nullable=False),
@@ -420,11 +420,16 @@ def save_data(data, file, username):
 
         print(f"Debug - Role recommendation before save: {role_recommendation}")
 
-        # Dynamically create table
+        # Create unique identifier based on name and contact details
+        unique_id = generate_unique_id(data)
+
+        # Create the table
         resume_table = create_user_table(username)
         metadata.create_all(db.engine)
 
         resume_data = {
+            "id": unique_id,  # Use unique_id instead of filename
+            "filename": str(file),
             "name": str(data.name),
             "contact_details": str(contact_details),
             "skills": str(skills),
@@ -436,23 +441,26 @@ def save_data(data, file, username):
             "role_recommendation": str(role_recommendation),
         }
 
-        existing_resume = db.session.query(resume_table).filter_by(id=file).first()
+        # Check if resume exists using unique_id
+        existing_resume = db.session.query(resume_table).filter_by(id=unique_id).first()
         if existing_resume:
-            # Update existing resume using update()
-            for key, value in resume_data.items():
-                setattr(existing_resume, key, value)
-            db.session.commit()
+            # Update using update() method instead of direct attribute modification
+            db.session.execute(
+                resume_table.update()
+                .where(resume_table.c.id == unique_id)
+                .values(**resume_data)
+            )
         else:
             # Insert a new resume
-            insert_stmt = resume_table.insert().values(id=file, **resume_data)
+            insert_stmt = resume_table.insert().values(**resume_data)
             db.session.execute(insert_stmt)
 
         db.session.commit()
-        print(f"Saved to database: {file}")
+        print(f"Saved to database with ID: {unique_id}")
         print(f"Role recommendation data being saved: {role_recommendation}")
 
-        # Save to Chroma
-        save_to_chroma(data, file, username)
+        # Save to Chroma using unique_id instead of filename
+        save_to_chroma(data, unique_id, username)
 
     except Exception as e:
         print(f"Error in save_data: {str(e)}")
@@ -461,7 +469,19 @@ def save_data(data, file, username):
         raise
 
 
-def save_to_chroma(data, file, username):
+def generate_unique_id(data):
+    """Generate a unique identifier for a resume based on name and contact details"""
+    import hashlib
+
+    # Combine name and email (or other unique identifiers) to create a unique string
+    unique_string = f"{data.name}_{data.contact_details.get('email', '')}"
+
+    # Create a hash of the unique string
+    hash_object = hashlib.md5(unique_string.encode())
+    return hash_object.hexdigest()
+
+
+def save_to_chroma(data, unique_key, username):
     try:
         chroma_collection = create_user_chroma_collection(username)
 
@@ -480,7 +500,7 @@ def save_to_chroma(data, file, username):
         if data is None:
             raise ValueError("No data found in the database.")
 
-        primary_key = file
+        primary_key = unique_key
 
         for column, column_data in combined_text.items():
             # Extract the text for the current column and row
@@ -503,7 +523,7 @@ def save_to_chroma(data, file, username):
                 ids=id,
                 metadatas=meta,
             )
-        print(f"Saved to Chroma: {file}")
+        print(f"Saved to Chroma: {unique_key}")
     except Exception as e:
         print(f"An error occurred while saving to Chroma: {e}")
 
@@ -633,10 +653,12 @@ def list_resumes():
             available_roles = [row[0] for row in conn.execute(roles_query).fetchall()]
             print("Available roles:", available_roles)
 
-            # Modified base query to properly handle JSON string parsing
+            # Base query without pagination
             base_query = f"SELECT * FROM {current_user.username}"
+            count_query = f"SELECT COUNT(*) FROM {current_user.username}"
+
             if role_filter:
-                base_query += """
+                role_condition = """
                     WHERE (
                         SELECT COUNT(*)
                         FROM json_each(json_extract(role_recommendation, '$'))
@@ -644,23 +666,31 @@ def list_resumes():
                         OR LOWER(json_extract(value, '$.job_title')) LIKE LOWER(:partial_role)
                     ) > 0
                 """
-                params = {
+                base_query += role_condition
+                count_query += role_condition
+                query_params = {
                     "role": f"%{role_filter}%",
                     "partial_role": f"%{' '.join(role_filter.split())}%",
-                    "limit": per_page,
-                    "offset": offset,
                 }
             else:
-                params = {"limit": per_page, "offset": offset}
+                query_params = {}
 
+            # Get total count first
+            count_result = conn.execute(text(count_query), query_params).scalar()
+            total_count = count_result if count_result is not None else 0
+
+            # Add pagination to base query
             base_query += " LIMIT :limit OFFSET :offset"
-            print("Executing query:", base_query)
-            print("With parameters:", params)
+            query_params["limit"] = str(per_page)
+            query_params["offset"] = str(offset)
 
-            # Execute query
-            result = conn.execute(text(base_query), params)
+            print("Executing query:", base_query)
+            print("With parameters:", query_params)
+
+            # Execute paginated query
+            result = conn.execute(text(base_query), query_params)
             resumes = result.fetchall()
-            print(f"Found {len(resumes)} resumes")
+            print(f"Found {len(resumes)} resumes on current page")
 
             # Process results
             resumes_data = []
@@ -762,11 +792,8 @@ def list_resumes():
                 print("\nFinal resume dict keys:", resume_dict.keys())
                 resumes_data.append(resume_dict)
 
-            print("\nTotal processed resumes:", len(resumes_data))
-
-            # Add these lines before the template rendering
-            count = len(resumes_data)
-            total_pages = (count + per_page - 1) // per_page
+            # Calculate total pages based on total count
+            total_pages = (total_count + per_page - 1) // per_page
 
             if not resumes_data:
                 return render_template(
@@ -774,8 +801,8 @@ def list_resumes():
                     resumes=[],
                     page=page,
                     per_page=per_page,
-                    total=0,
-                    total_pages=0,
+                    total=total_count,
+                    total_pages=total_pages,
                     available_roles=available_roles,
                     current_role=role_filter,
                 )
@@ -785,7 +812,7 @@ def list_resumes():
                 resumes=resumes_data,
                 page=page,
                 per_page=per_page,
-                total=count,
+                total=total_count,
                 total_pages=total_pages,
                 available_roles=available_roles,
                 current_role=role_filter,
@@ -1052,6 +1079,8 @@ def generate_final_response(data, query, chat_history):
     - Format all outputs in Markdown
     - Include relevant resume URLs when referencing specific documents
     - Structure responses for clarity and readability
+    - Avoid using code formatting in the Markdown.
+    - Never talk anything about the database.
 
     4. Special Cases:
     - Respond to the user's query in a professional manner.
