@@ -250,7 +250,7 @@ def generate_quantitaive_serach_query(
 def qualitative_search(
     collection: chromadb.Collection, data: Dict[str, str], primary_key: str
 ) -> Optional[List[Any]]:
-    """Performs a similarity search on the database and returns all similar results.
+    """Performs a similarity search on the database and returns results above threshold.
 
     Args:
         collection (chromadb.Collection): The ChromaDB collection to search.
@@ -258,56 +258,60 @@ def qualitative_search(
         primary_key (str): The primary key column name in the database.
 
     Returns:
-        List[str]: A dictionary containing the search results.
+        List[str]: A list of primary keys for results above the similarity threshold.
     """
     results = []
+    count_in_chroma = collection.count()
+    print(f"Total elements in the collection {count_in_chroma}")
+    threshold = 0.3
+
+    # Validate we have data to search
+    if count_in_chroma == 0:
+        return None
 
     for column, condition in data.items():
-        query_result = collection.query(
-            query_texts=condition, n_results=5, where={"column_name": column}
-        )
+        print(f"Searching in the {column}")
+        # Ensure valid query with error handling
+        try:
+            query_result = collection.query(
+                query_texts=condition,
+                n_results=count_in_chroma,
+                where={"column_name": column},
+            )
 
-        if query_result["metadatas"]:
-            results.extend(
-                query_result["metadatas"]
-            )  # Assuming metadatas is a list of dictionaries
+            distances = query_result.get("distances", [])
+            num_matches = len(distances[0]) if distances and len(distances) > 0 else 0
+            print(f"Query results for column '{column}': {num_matches} matches")
 
-        ids = []
-        for result in results:
-            for item in result:
-                ids.append(item.get(primary_key))
+            # Get metadatas and distances
+            metadatas = query_result.get("metadatas", [])
+            distances = query_result.get("distances", [])
 
-        return ids
+            # Process results if we have both metadata and distances
+            if metadatas and distances and len(metadatas) > 0:
+                # ChromaDB returns a list with one element per query
+                for i in range(len(metadatas[0])):
+                    # Convert distance to similarity score (0-1)
+                    similarity = 1 - (distances[0][i] / 2)
 
+                    if similarity >= threshold:
+                        results.append(metadatas[0][i])
 
-# def qualitative_search(
-#     collection: chromadb.Collection, data: Dict[str, str], primary_key: str, threshold: float = 0.8
-# ) -> List[Any]:
-#     """Performs a similarity search on the database and returns all similar results above a given threshold.
+        except Exception as e:
+            print(f"Error searching column '{column}': {e}")
+            continue
 
-#     Args:
-#         collection (chromadb.Collection): The ChromaDB collection to search.
-#         data (Dict[str, str]): A dictionary of qualitative data to search for.
-#         primary_key (str): The primary key column name in the database.
-#         threshold (float): The minimum similarity score for a result to be included. Defaults to 0.8.
+    # Extract unique primary keys from filtered results
+    ids = []
+    seen = set()  # To track unique IDs
 
-#     Returns:
-#         List[str]: A list of primary keys for matching entries in the database.
-#     """
-#     ids = []
-#     for column, condition in data.items():
-#         query_result = collection.query(
-#             query_texts=condition,
-#             n_results=10,  # Get a reasonable number of results to filter from
-#             where={"column_name": column}
-#         )
+    for result in results:
+        id_value = result.get(primary_key)
+        if id_value and id_value not in seen:
+            ids.append(id_value)
+            seen.add(id_value)
 
-#         for distances, metadatas in zip(query_result['distances'], query_result['metadatas']):
-#             for distance, metadata in zip(distances, metadatas):
-#                 if distance >= threshold:
-#                     ids.append(metadata.get(primary_key))
-
-#     return ids
+    return ids if ids else None
 
 
 # def qualitaive_search(collection: chromadb.Collection, data: Dict[str, str], primary_key: str) -> List[str]:

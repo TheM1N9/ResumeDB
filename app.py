@@ -52,6 +52,7 @@ from sqlalchemy import (
     String,
     DateTime,
 )
+import hashlib
 
 load_dotenv()
 
@@ -106,7 +107,6 @@ def create_user_table(username):
         username,
         metadata,
         db.Column("id", db.String, primary_key=True),
-        db.Column("filename", db.String, nullable=False),
         db.Column("name", db.String, nullable=False),
         db.Column("contact_details", db.JSON, nullable=False),
         db.Column("skills", db.JSON, nullable=False),
@@ -392,7 +392,7 @@ def generate_data(text):
         )
 
 
-def save_data(data, file, username):
+def save_data(data, unique_id, username):
     """Refactored function to save data to both database and Chroma"""
     try:
         # Serialize data to JSON with error handling
@@ -420,16 +420,12 @@ def save_data(data, file, username):
 
         print(f"Debug - Role recommendation before save: {role_recommendation}")
 
-        # Create unique identifier based on name and contact details
-        unique_id = generate_unique_id(data)
-
         # Create the table
         resume_table = create_user_table(username)
         metadata.create_all(db.engine)
 
         resume_data = {
-            "id": unique_id,  # Use unique_id instead of filename
-            "filename": str(file),
+            "id": unique_id,
             "name": str(data.name),
             "contact_details": str(contact_details),
             "skills": str(skills),
@@ -459,7 +455,7 @@ def save_data(data, file, username):
         print(f"Saved to database with ID: {unique_id}")
         print(f"Role recommendation data being saved: {role_recommendation}")
 
-        # Save to Chroma using unique_id instead of filename
+        # Save to Chroma using unique_id
         save_to_chroma(data, unique_id, username)
 
     except Exception as e:
@@ -471,7 +467,6 @@ def save_data(data, file, username):
 
 def generate_unique_id(data):
     """Generate a unique identifier for a resume based on name and contact details"""
-    import hashlib
 
     # Combine name and email (or other unique identifiers) to create a unique string
     unique_string = f"{data.name}_{data.contact_details.get('email', '')}"
@@ -561,13 +556,14 @@ def upload_form():
         if not file.filename:
             continue
 
-        filename = secure_filename(file.filename)
-        file_path = os.path.join(user_folder, filename)
+        # Get file extension from original filename
+        original_filename = secure_filename(file.filename)
+        file_extension = get_file_extension(original_filename)
 
         # File type validation using filetype library
         kind = filetype.guess(file)
         if kind is None:
-            flash(f"Invalid file type: {filename}", "error")
+            flash(f"Invalid file type: {original_filename}", "error")
             continue
         elif kind.mime not in [
             "application/pdf",
@@ -576,36 +572,54 @@ def upload_form():
             "text/plain",
         ]:
             flash(
-                f"Unsupported file type: {filename}. Only PDF, DOC, DOCX, and TXT are allowed.",
+                f"Unsupported file type: {original_filename}. Only PDF, DOC, DOCX, and TXT are allowed.",
                 "error",
             )
             continue
 
-        # Save file
-        file.save(file_path)
+        # Save file temporarily for processing
+        temp_filename = f"temp_{original_filename}"
+        temp_file_path = os.path.join(user_folder, temp_filename)
+        file.save(temp_file_path)
 
-        # Process based on file extension
-        file_extension = get_file_extension(filename)
-        if file_extension == "pdf":
-            content = pdf_file_loader(file_path)
-        elif file_extension in ["doc", "docx"]:
-            content = doc_file_loader(file_path)
-        else:
-            flash(f"Unsupported file type: {file_extension}", "error")
+        try:
+            # Process based on file extension
+            file_extension = get_file_extension(original_filename)
+            if file_extension == "pdf":
+                content = pdf_file_loader(temp_file_path)
+            elif file_extension in ["doc", "docx"]:
+                content = doc_file_loader(temp_file_path)
+            else:
+                flash(f"Unsupported file type: {file_extension}", "error")
+                continue
+
+            # Generate structured data from the file content
+            structured_data = generate_data(content)
+
+            # Generate unique ID based on the data
+            unique_id = generate_unique_id(structured_data)
+
+            # Create new filename with hash and original extension
+            new_filename = f"{unique_id}.{file_extension}"
+            new_file_path = os.path.join(user_folder, new_filename)
+
+            # Move the temporary file to its final location
+            os.rename(temp_file_path, new_file_path)
+
+            # Save structured data to the database and Chroma
+            save_data(structured_data, unique_id, current_user.username)
+
+            flash(
+                f"File {original_filename} uploaded and processed successfully!",
+                "success",
+            )
+
+        except Exception as e:
+            # Clean up temporary file if there's an error
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+            flash(f"Error processing file {original_filename}: {str(e)}", "error")
             continue
-
-        # print(f"type of content: {type(content)}")
-
-        # print(f"extracted content: {content}")
-        # print(content)
-
-        # Generate structured data from the file content
-        structured_data = generate_data(content)
-
-        # Save structured data to the database and Chroma
-        save_data(structured_data, filename, current_user.username)
-
-        flash(f"File {filename} uploaded and processed successfully!", "success")
 
     return redirect(url_for("upload"))
 
@@ -832,11 +846,15 @@ def list_resumes():
 @login_required
 def uploaded_file(filename):
     user_folder = os.path.join(app.config["UPLOAD_FOLDER"], current_user.username)
-    file_path = os.path.join(user_folder, filename)
-    if not os.path.exists(file_path):
-        flash("The requested file does not exist.")
-        return redirect(url_for("list_resumes"))  # Or another appropriate page
-    return send_from_directory(user_folder, filename)
+
+    # Check if the file exists with any of the allowed extensions
+    for ext in ALLOWED_EXTENSIONS:
+        file_path = os.path.join(user_folder, f"{filename}.{ext}")
+        if os.path.exists(file_path):
+            return send_from_directory(user_folder, f"{filename}.{ext}")
+
+    flash("The requested file does not exist.")
+    return redirect(url_for("list_resumes"))
 
 
 @app.route("/download-data", methods=["GET"])

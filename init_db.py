@@ -47,7 +47,6 @@ class ConversationHistory(db.Model):
 class Resume(db.Model):
     __tablename__ = "resumes"
     id = db.Column(db.String, primary_key=True)
-    filename = db.Column(db.String, nullable=False)
     name = db.Column(db.String, nullable=False)
     contact_details = db.Column(db.JSON, nullable=False)
     skills = db.Column(db.JSON, nullable=False)
