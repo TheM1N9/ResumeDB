@@ -1112,7 +1112,7 @@ def generate_final_response(data, query, chat_history):
     - Request clarification when queries are ambiguous
     - Provide guidance for malformed queries
 
-    The link for the resumes is "http://localhost:5000/uploads/id(or)filename". 
+    The link for the resumes is "http://localhost:5000/uploads/id" example: "http://localhost:5000/uploads/44bfdf9a8bc32d6e453a46....". 
 
     OUTPUT REQUIREMENTS:
     - Always use Markdown formatting
