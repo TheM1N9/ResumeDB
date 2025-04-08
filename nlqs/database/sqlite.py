@@ -64,8 +64,8 @@ class SQLiteDriver(AbstractDriver):
             self.cursor.execute(query)
             result = self.cursor.fetchall()
             self._db_connection.commit()
-            print(f"result: {result}")
-            print("--------------------")
+            # print(f"result: {result}")
+            # print("--------------------")
             logger.info(f"Query executed successfully: {result}")
             return result if result else []
         except sqlite3.Error as e:

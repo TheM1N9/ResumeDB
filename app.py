@@ -236,7 +236,7 @@ def generate_data(text):
 
                 1. Extract and structure these key components:
                 - Personal Information:
-                    * Full name
+                    * Full name, use pascal case for the name.
                     * Contact details (email, phone, location, LinkedIn)
                     * Professional summary
 
@@ -257,7 +257,7 @@ def generate_data(text):
                     * Industry exposure
                 
                 - For each recommended role, specify:
-                    * Exact job title (use standard industry titles)
+                    * Exact job title (use standard industry titles), use pascal case
                     * Seniority level
                     * Key qualifications they meet
                     * Any critical skill gaps
@@ -309,8 +309,8 @@ def generate_data(text):
     prompt = PromptTemplate.from_template(template)
     llm = ChatGoogleGenerativeAI(
         api_key=SecretStr(GEMINI_API_KEY),
-        model="gemini-2.0-flash-exp",
-        temperature=0.5,
+        model="gemini-2.0-pro-exp",
+        temperature=0.1,
     )
     llm_chain = prompt | llm | StrOutputParser()
 
@@ -580,6 +580,9 @@ def upload_form():
         # Save file temporarily for processing
         temp_filename = f"temp_{original_filename}"
         temp_file_path = os.path.join(user_folder, temp_filename)
+
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
         file.save(temp_file_path)
 
         try:
@@ -602,6 +605,9 @@ def upload_form():
             # Create new filename with hash and original extension
             new_filename = f"{unique_id}.{file_extension}"
             new_file_path = os.path.join(user_folder, new_filename)
+
+            if os.path.exists(new_file_path):
+                os.remove(new_file_path)
 
             # Move the temporary file to its final location
             os.rename(temp_file_path, new_file_path)
@@ -1113,19 +1119,20 @@ def generate_final_response(data, query, chat_history):
     - Provide guidance for malformed queries
 
     The link for the resumes is "http://localhost:5000/uploads/id" example: "http://localhost:5000/uploads/44bfdf9a8bc32d6e453a46....". 
+    When outputing the resume link generate it in markdown. example: Resume: [Resume Link](http://localhost:5000/uploads/44bfdf9a8bc32d6e453a46....)
 
     OUTPUT REQUIREMENTS:
     - Always use Markdown formatting
     - Include data summaries when relevant
     - Maintain consistent response structure
-
+    - Sort the resumes according to the given query.
     User Query: {query}
     """
 
     prompt = PromptTemplate.from_template(template)
     llm = ChatGoogleGenerativeAI(
         api_key=SecretStr(GEMINI_API_KEY),
-        temperature=0.3,
+        temperature=0.1,
         model="gemini-2.0-pro-exp",
     )
     chain = prompt | llm | StrOutputParser()
