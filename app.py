@@ -28,7 +28,17 @@ from dataclasses import dataclass
 from typing import Dict, List
 from dotenv import load_dotenv
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import Table, MetaData, text
+from sqlalchemy import (
+    Table,
+    MetaData,
+    text,
+    Column,
+    Integer,
+    String,
+    DateTime,
+    ForeignKey,
+    Text,
+)
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import (
     UserMixin,
@@ -53,6 +63,7 @@ from sqlalchemy import (
     DateTime,
 )
 import hashlib
+from sqlalchemy.orm import relationship
 
 load_dotenv()
 
@@ -163,12 +174,13 @@ class Chat(db.Model):
 
 
 class ConversationHistory(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-    chat_id = db.Column(db.Integer, db.ForeignKey("chat.id"), nullable=False)
-    timestamp = db.Column(db.DateTime, nullable=False)
-    user_message = db.Column(db.Text, nullable=False)
-    bot_response = db.Column(db.Text, nullable=False)
+    __tablename__ = "conversation_history"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("user.id"), nullable=False)
+    chat_id = Column(Integer, ForeignKey("chat.id"), nullable=False)
+    timestamp = Column(DateTime, nullable=False)
+    user_message = Column(Text, nullable=False)
+    bot_response = Column(Text, nullable=False)
 
     def __init__(self, user_id, chat_id, timestamp, user_message, bot_response):
         self.user_id = user_id
@@ -977,8 +989,9 @@ def chat(chat_id):
         chat_history = []
         if current_chat:
             history = (
-                ConversationHistory.query.filter_by(chat_id=current_chat.id)
-                .order_by(ConversationHistory.timestamp)
+                db.session.query(ConversationHistory)
+                .filter_by(chat_id=current_chat.id)
+                .order_by("timestamp")
                 .all()
             )
             for msg in history:
@@ -1018,7 +1031,7 @@ def chat(chat_id):
         chat_history = (
             db.session.query(ConversationHistory)
             .filter_by(chat_id=current_chat.id)
-            .order_by(ConversationHistory.timestamp)
+            .order_by("timestamp")
             .all()
         )
 
@@ -1085,7 +1098,8 @@ def generate_final_response(data, query, chat_history):
     print("-------------------------------------------------")
 
     template = """
-    ResumeDB Assistant - An AI-powered Resume Analysis System by M1N9
+    ResumeDB Assistant - An AI-powered Resume Analysis System, created by M1N9. Your task is to answer the user's question with the data you have received.
+    Make sure you provide the accurate answers to the users questions.
 
 
     OPERATING GUIDELINES:

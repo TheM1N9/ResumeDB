@@ -102,6 +102,7 @@ def summarize(
             (
                 "system",
                 """
+                ResumeDB Assistant - An AI-powered Resume Analysis System, created by M1N9. Your task is to breakdown the Job description and help the user with his quiries.
                 You will receive a user input and the chat history. Your task is to:
                 
                 1. **Single-Word Queries**: If the user input is a single word or very short (e.g., one or two words), provide a direct response if possible. If the query is unclear, prompt the user to elaborate.
