@@ -64,6 +64,10 @@ from sqlalchemy import (
 )
 import hashlib
 from sqlalchemy.orm import relationship
+import concurrent.futures
+from functools import partial
+import time
+from threading import Lock
 
 load_dotenv()
 
@@ -546,27 +550,45 @@ def upload():
     return render_template("upload.html")
 
 
-@app.route("/uploadFile", methods=["POST"])
-@login_required
-def upload_form():
-    # Combine all selected files and folders
-    all_files = request.files.getlist("resumeFiles") + request.files.getlist(
-        "resumeFolder"
-    )
+# Add rate limiting for Gemini API
+class RateLimiter:
+    def __init__(self, max_requests, time_window):
+        self.max_requests = max_requests
+        self.time_window = time_window
+        self.requests = []
+        self.lock = Lock()
 
-    # Filter out invalid or empty files
-    valid_files = [file for file in all_files if file and file.filename]
+    def acquire(self):
+        with self.lock:
+            now = time.time()
+            # Remove old requests
+            self.requests = [
+                req_time
+                for req_time in self.requests
+                if now - req_time < self.time_window
+            ]
 
-    if not valid_files:
-        flash("No valid files or folder selected", "error")
-        return redirect(url_for("upload"))
+            if len(self.requests) >= self.max_requests:
+                # Wait until we can make another request
+                sleep_time = self.requests[0] + self.time_window - now
+                if sleep_time > 0:
+                    time.sleep(sleep_time)
+                # Remove the oldest request
+                self.requests.pop(0)
 
-    # Create user-specific folder
-    user_folder = create_user_folder(current_user.username)
+            self.requests.append(now)
 
-    for file in valid_files:
+
+# Create a rate limiter for Gemini API (10 requests per minute)
+gemini_rate_limiter = RateLimiter(max_requests=10, time_window=60)
+
+
+def process_single_file(file, user_folder, username):
+    """Process a single file and return the result."""
+    # Create a new application context for this thread
+    with app.app_context():
         if not file.filename:
-            continue
+            return None, "No filename provided"
 
         # Get file extension from original filename
         original_filename = secure_filename(file.filename)
@@ -575,19 +597,17 @@ def upload_form():
         # File type validation using filetype library
         kind = filetype.guess(file)
         if kind is None:
-            flash(f"Invalid file type: {original_filename}", "error")
-            continue
+            return None, f"Invalid file type: {original_filename}"
         elif kind.mime not in [
             "application/pdf",
             "application/msword",
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             "text/plain",
         ]:
-            flash(
+            return (
+                None,
                 f"Unsupported file type: {original_filename}. Only PDF, DOC, DOCX, and TXT are allowed.",
-                "error",
             )
-            continue
 
         # Save file temporarily for processing
         temp_filename = f"temp_{original_filename}"
@@ -599,14 +619,15 @@ def upload_form():
 
         try:
             # Process based on file extension
-            file_extension = get_file_extension(original_filename)
             if file_extension == "pdf":
                 content = pdf_file_loader(temp_file_path)
             elif file_extension in ["doc", "docx"]:
                 content = doc_file_loader(temp_file_path)
             else:
-                flash(f"Unsupported file type: {file_extension}", "error")
-                continue
+                return None, f"Unsupported file type: {file_extension}"
+
+            # Acquire rate limit before calling Gemini API
+            gemini_rate_limiter.acquire()
 
             # Generate structured data from the file content
             structured_data = generate_data(content)
@@ -625,19 +646,70 @@ def upload_form():
             os.rename(temp_file_path, new_file_path)
 
             # Save structured data to the database and Chroma
-            save_data(structured_data, unique_id, current_user.username)
+            save_data(structured_data, unique_id, username)
 
-            flash(
+            return (
+                True,
                 f"File {original_filename} uploaded and processed successfully!",
-                "success",
             )
 
         except Exception as e:
             # Clean up temporary file if there's an error
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
-            flash(f"Error processing file {original_filename}: {str(e)}", "error")
-            continue
+            return None, f"Error processing file {original_filename}: {str(e)}"
+
+
+@app.route("/uploadFile", methods=["POST"])
+@login_required
+def upload_form():
+    # Combine all selected files and folders
+    all_files = request.files.getlist("resumeFiles") + request.files.getlist(
+        "resumeFolder"
+    )
+
+    # Filter out invalid or empty files
+    valid_files = [file for file in all_files if file and file.filename]
+
+    if not valid_files:
+        flash("No valid files or folder selected", "error")
+        return redirect(url_for("upload"))
+
+    # Create user-specific folder
+    user_folder = create_user_folder(current_user.username)
+
+    # Process files in parallel with a limited number of workers
+    # Use min(10, number of files) to avoid creating too many threads
+    max_workers = min(10, len(valid_files))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # Create a partial function with the fixed arguments
+        process_file = partial(
+            process_single_file, user_folder=user_folder, username=current_user.username
+        )
+        # Submit all files for processing
+        futures = [executor.submit(process_file, file) for file in valid_files]
+        # Get results as they complete
+        results = [
+            future.result() for future in concurrent.futures.as_completed(futures)
+        ]
+
+    # Process results
+    successful_uploads = []
+    failed_uploads = []
+    for success, message in results:
+        if success:
+            successful_uploads.append(message)
+        else:
+            failed_uploads.append(message)
+
+    # Show appropriate flash messages
+    if successful_uploads:
+        flash(f"Successfully processed {len(successful_uploads)} files", "success")
+    if failed_uploads:
+        flash(
+            f"Failed to process {len(failed_uploads)} files: {', '.join(failed_uploads)}",
+            "error",
+        )
 
     return redirect(url_for("upload"))
 
