@@ -559,24 +559,22 @@ class RateLimiter:
         self.lock = Lock()
 
     def acquire(self):
-        with self.lock:
-            now = time.time()
-            # Remove old requests
-            self.requests = [
-                req_time
-                for req_time in self.requests
-                if now - req_time < self.time_window
-            ]
-
-            if len(self.requests) >= self.max_requests:
-                # Wait until we can make another request
+        while True:
+            with self.lock:
+                now = time.time()
+                # Remove old requests
+                self.requests = [
+                    req_time
+                    for req_time in self.requests
+                    if now - req_time < self.time_window
+                ]
+                if len(self.requests) < self.max_requests:
+                    self.requests.append(now)
+                    return
                 sleep_time = self.requests[0] + self.time_window - now
-                if sleep_time > 0:
-                    time.sleep(sleep_time)
-                # Remove the oldest request
-                self.requests.pop(0)
-
-            self.requests.append(now)
+            # Sleep outside the lock so other threads can proceed
+            if sleep_time > 0:
+                time.sleep(sleep_time)
 
 
 # Create a rate limiter for Gemini API (10 requests per minute)
@@ -597,17 +595,17 @@ def process_single_file(file, user_folder, username):
         # File type validation using filetype library
         kind = filetype.guess(file)
         if kind is None:
-            return None, f"Invalid file type: {original_filename}"
+            # Read the magic-number bytes for type detection, then reset to allow further reads
+            file.seek(0)
+            kind = filetype.guess(file.read(261))
+            file.seek(0)
         elif kind.mime not in [
             "application/pdf",
             "application/msword",
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             "text/plain",
         ]:
-            return (
-                None,
-                f"Unsupported file type: {original_filename}. Only PDF, DOC, DOCX, and TXT are allowed.",
-            )
+            f"Unsupported file type: {original_filename}. Only PDF, DOC, DOCX, and TXT are allowed.",
 
         # Save file temporarily for processing
         temp_filename = f"temp_{original_filename}"
@@ -618,11 +616,13 @@ def process_single_file(file, user_folder, username):
         file.save(temp_file_path)
 
         try:
-            # Process based on file extension
             if file_extension == "pdf":
                 content = pdf_file_loader(temp_file_path)
             elif file_extension in ["doc", "docx"]:
                 content = doc_file_loader(temp_file_path)
+            elif file_extension == "txt":
+                with open(temp_file_path, "r", encoding="utf-8", errors="ignore") as f:
+                    content = f.read()
             else:
                 return None, f"Unsupported file type: {file_extension}"
 
