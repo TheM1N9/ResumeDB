@@ -551,31 +551,30 @@ def upload():
 
 
 # Add rate limiting for Gemini API
+from threading import Lock
+from collections import deque
+
 class RateLimiter:
     def __init__(self, max_requests, time_window):
         self.max_requests = max_requests
         self.time_window = time_window
-        self.requests = []
+        self.requests = deque()
         self.lock = Lock()
 
     def acquire(self):
         while True:
             with self.lock:
                 now = time.time()
-                # Remove old requests
-                self.requests = [
-                    req_time
-                    for req_time in self.requests
-                    if now - req_time < self.time_window
-                ]
+                # Expire old requests in O(1) each
+                while self.requests and now - self.requests[0] >= self.time_window:
+                    self.requests.popleft()
                 if len(self.requests) < self.max_requests:
                     self.requests.append(now)
                     return
-                sleep_time = self.requests[0] + self.time_window - now
+                sleep_time = (self.requests[0] + self.time_window) - now
             # Sleep outside the lock so other threads can proceed
             if sleep_time > 0:
                 time.sleep(sleep_time)
-
 
 # Create a rate limiter for Gemini API (10 requests per minute)
 gemini_rate_limiter = RateLimiter(max_requests=10, time_window=60)
