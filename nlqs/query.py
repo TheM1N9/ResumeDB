@@ -264,7 +264,7 @@ def qualitative_search(
     results = []
     count_in_chroma = collection.count()
     print(f"Total elements in the collection {count_in_chroma}")
-    threshold = 0.5
+    threshold = 0.3
 
     # Validate we have data to search
     if count_in_chroma == 0:
