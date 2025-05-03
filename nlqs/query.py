@@ -251,15 +251,15 @@ def generate_quantitaive_serach_query(
 def qualitative_search(
     collection: chromadb.Collection, data: Dict[str, str], primary_key: str
 ) -> Optional[List[Any]]:
-    """Performs a similarity search on the database and returns results above threshold.
-
+    """
+    Performs a qualitative similarity search on a ChromaDB collection and returns unique primary keys for results above a similarity threshold.
+    
     Args:
-        collection (chromadb.Collection): The ChromaDB collection to search.
-        data (Dict[str, str]): A dictionary of qualitative data to search for.
-        primary_key (str): The primary key column name in the database.
-
+        data: Dictionary mapping column names to qualitative search conditions.
+        primary_key: Name of the primary key column to extract from matching results.
+    
     Returns:
-        List[str]: A list of primary keys for results above the similarity threshold.
+        A list of unique primary key values for entries matching the qualitative conditions with similarity above 0.3, or None if no matches are found.
     """
     results = []
     count_in_chroma = collection.count()

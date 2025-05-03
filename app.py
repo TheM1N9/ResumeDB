@@ -547,6 +547,9 @@ def index():
 @app.route("/upload", methods=["GET", "POST"])
 @login_required
 def upload():
+    """
+    Renders the resume upload page.
+    """
     return render_template("upload.html")
 
 
@@ -556,12 +559,26 @@ from collections import deque
 
 class RateLimiter:
     def __init__(self, max_requests, time_window):
+        """
+        Initializes a RateLimiter to restrict the number of allowed requests within a time window.
+        
+        Args:
+            max_requests: Maximum number of requests permitted in the specified time window.
+            time_window: Time window in seconds during which the request limit applies.
+        """
         self.max_requests = max_requests
         self.time_window = time_window
         self.requests = deque()
         self.lock = Lock()
 
     def acquire(self):
+        """
+        Blocks until a rate limiter token is available, enforcing the request rate limit.
+        
+        Waits as needed to ensure that no more than the allowed number of requests are made
+        within the configured time window. This method is thread-safe and should be called
+        before performing a rate-limited operation.
+        """
         while True:
             with self.lock:
                 now = time.time()
@@ -581,7 +598,19 @@ gemini_rate_limiter = RateLimiter(max_requests=10, time_window=60)
 
 
 def process_single_file(file, user_folder, username):
-    """Process a single file and return the result."""
+    """
+    Processes a single uploaded resume file, extracting content, generating structured data, and saving results.
+    
+    Validates the file type, extracts text based on format (PDF, DOC/DOCX, or TXT), applies rate limiting for API calls, generates structured resume data, assigns a unique identifier, renames and stores the file, and persists the data to the database and Chroma vector store. Returns a tuple indicating success and a status message.
+    
+    Args:
+        file: The uploaded file object to process.
+        user_folder: Path to the user's upload directory.
+        username: The username associated with the upload.
+    
+    Returns:
+        A tuple (success, message), where success is True if processing succeeded, or None if an error occurred, and message provides details.
+    """
     # Create a new application context for this thread
     with app.app_context():
         if not file.filename:
@@ -663,6 +692,11 @@ def process_single_file(file, user_folder, username):
 @login_required
 def upload_form():
     # Combine all selected files and folders
+    """
+    Handles concurrent upload and processing of multiple resume files for the current user.
+    
+    Combines files and folders selected in the upload form, validates and processes each file in parallel using a thread pool, and applies rate limiting for API calls. Aggregates success and failure results, flashes summary messages, and redirects to the upload page.
+    """
     all_files = request.files.getlist("resumeFiles") + request.files.getlist(
         "resumeFolder"
     )
