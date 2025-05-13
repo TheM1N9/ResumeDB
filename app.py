@@ -591,7 +591,6 @@ def process_single_file(file, user_folder, username):
         original_filename = secure_filename(file.filename)
         file_extension = get_file_extension(original_filename)
 
-
         # File type validation using filetype library
         kind = filetype.guess(file)
         if kind is None:
@@ -608,7 +607,6 @@ def process_single_file(file, user_folder, username):
             "text/plain",
         }:
             return None, f"Unsupported file type: {original_filename}. Only PDF, DOC, DOCX, and TXT are allowed."
-
 
         # Save file temporarily for processing
         temp_filename = f"temp_{original_filename}"
